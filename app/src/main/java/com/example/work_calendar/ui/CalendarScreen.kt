@@ -51,6 +51,7 @@ fun CalendarScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -63,6 +64,11 @@ fun CalendarScreen(
                 selectedDate = LocalDate.now()
             },
             onOpenSettings = onOpenSettings,
+        )
+        UpdateBanner(
+            state = updateState,
+            onUpdate = { viewModel.startUpdate() },
+            onDismiss = { viewModel.dismissUpdate() },
         )
         WeekHeaderRow()
         MonthGrid(

@@ -14,13 +14,20 @@ import com.example.work_calendar.data.ShiftAlarmDefaults
 import com.example.work_calendar.data.ShiftRepository
 import com.example.work_calendar.data.ShiftSchedule
 import com.example.work_calendar.data.ShiftType
+import com.example.work_calendar.update.DownloadEvent
+import com.example.work_calendar.update.UpdateChecker
+import com.example.work_calendar.update.UpdateInfo
+import com.example.work_calendar.update.UpdateInstaller
 import com.example.work_calendar.widget.WorkCalendarWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -31,6 +38,14 @@ data class CalendarUiState(
     val entries: Map<String, DayEntry>,
     val defaults: ShiftAlarmDefaults,
 )
+
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data class Available(val info: UpdateInfo) : UpdateUiState
+    data class Downloading(val info: UpdateInfo, val downloaded: Long, val total: Long) : UpdateUiState
+    data class ReadyToInstall(val file: File, val info: UpdateInfo) : UpdateUiState
+    data class Failed(val message: String) : UpdateUiState
+}
 
 class CalendarViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -47,6 +62,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         CalendarUiState(YearMonth.now(), emptyMap(), ShiftAlarmDefaults()),
     )
 
+    private val _updateState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
+    val updateState: StateFlow<UpdateUiState> = _updateState.asStateFlow()
+
+    init {
+        checkForUpdate()
+    }
+
     fun showMonth(month: YearMonth) { monthState.value = month }
 
     fun resolvedShift(date: LocalDate, entries: Map<String, DayEntry>): ShiftType =
@@ -60,7 +82,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** 이 날짜가 속한 AA 짝을 DA로 변경 (첫 A → D). A가 아니면 무시. */
     fun convertAaPairToDa(date: LocalDate) {
         val firstA = ShiftSchedule.firstAOfPair(date) ?: return
         viewModelScope.launch {
@@ -91,14 +112,64 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            val current = currentVersionCode()
+            val info = UpdateChecker.fetchLatestUpdate(current) ?: return@launch
+            _updateState.value = UpdateUiState.Available(info)
+        }
+    }
+
+    fun startUpdate() {
+        val available = _updateState.value as? UpdateUiState.Available ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            UpdateInstaller.download(app, available.info.apkUrl)
+                .catch { error ->
+                    _updateState.value = UpdateUiState.Failed(
+                        error.message ?: "다운로드 실패"
+                    )
+                }
+                .collect { event ->
+                    when (event) {
+                        is DownloadEvent.Progress -> {
+                            _updateState.value = UpdateUiState.Downloading(
+                                info = available.info,
+                                downloaded = event.downloaded,
+                                total = event.total,
+                            )
+                        }
+                        is DownloadEvent.Complete -> {
+                            _updateState.value = UpdateUiState.ReadyToInstall(
+                                file = event.file,
+                                info = available.info,
+                            )
+                            UpdateInstaller.launchInstall(app, event.file)
+                        }
+                    }
+                }
+        }
+    }
+
+    fun dismissUpdate() {
+        _updateState.value = UpdateUiState.Idle
+    }
+
+    private fun currentVersionCode(): Int {
+        val ctx = getApplication<Application>()
+        return runCatching {
+            val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+            info.longVersionCode.toInt()
+        }.getOrDefault(0)
+    }
+
     private suspend fun rescheduleUpcoming() {
         val ctx = getApplication<Application>()
         val state: RepoState = repo.snapshot()
         val today = LocalDate.now()
-        var date = today.minusDays(1) // N근무 전날 알람을 잡으려면 어제까지 포함
+        var date = today.minusDays(1)
         val end = today.plusDays(RESCHEDULE_WINDOW_DAYS)
         while (date.isBefore(end)) {
-            // shiftDate 입장에서 cancel
             AlarmScheduler.cancel(ctx, date)
             val effective = repo.effectiveAlarmTime(date, state.entries, state.defaults)
             if (effective != null) {

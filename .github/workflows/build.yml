@@ -28,6 +28,8 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
+        env:
+          BUILD_VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Stage APK

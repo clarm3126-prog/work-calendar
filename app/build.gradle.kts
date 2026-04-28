@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val ciVersionCode: Int = (System.getenv("BUILD_VERSION_CODE") ?: "1").toInt()
+val ciVersionName: String = "1.0.${ciVersionCode}"
+
 android {
     namespace = "com.example.work_calendar"
     compileSdk {
@@ -16,13 +19,25 @@ android {
         applicationId = "com.example.work_calendar"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = ciVersionCode
+        versionName = ciVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -37,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
