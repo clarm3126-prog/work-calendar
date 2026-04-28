@@ -21,7 +21,9 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -62,7 +64,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(GlanceTheme.colors.background)
+                .background(Color(0xFF000000))
                 .padding(horizontal = 6.dp, vertical = 6.dp)
                 .clickable(actionStartActivity<MainActivity>()),
         ) {
@@ -86,14 +88,14 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = GlanceTheme.colors.onBackground,
+                    color = ColorProvider(Color(0xFFEFEFEF)),
                 ),
             )
             Text(
                 text = todayText,
                 style = TextStyle(
                     fontSize = 10.sp,
-                    color = GlanceTheme.colors.onSurfaceVariant,
+                    color = ColorProvider(Color(0xFFBDBDBD)),
                     fontWeight = FontWeight.Medium,
                 ),
             )
@@ -106,9 +108,9 @@ class WorkCalendarWidget : GlanceAppWidget() {
         Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 2.dp)) {
             labels.forEachIndexed { index, label ->
                 val color = when (index) {
-                    0 -> ColorProvider(Color(0xFFD32F2F))
-                    6 -> ColorProvider(Color(0xFF1976D2))
-                    else -> GlanceTheme.colors.onSurfaceVariant
+                    0 -> ColorProvider(Color(0xFFEF5350))
+                    6 -> ColorProvider(Color(0xFF42A5F5))
+                    else -> ColorProvider(Color(0xFFBDBDBD))
                 }
                 Box(
                     modifier = GlanceModifier.defaultWeight(),
@@ -157,17 +159,17 @@ class WorkCalendarWidget : GlanceAppWidget() {
     @Composable
     private fun WidgetDayCell(date: LocalDate, shift: ShiftType, isToday: Boolean) {
         val numColor = when (date.dayOfWeek) {
-            DayOfWeek.SUNDAY -> Color(0xFFD32F2F)
-            DayOfWeek.SATURDAY -> Color(0xFF1976D2)
-            else -> Color(0xFF212121)
+            DayOfWeek.SUNDAY -> Color(0xFFEF5350)
+            DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
+            else -> Color(0xFFEFEFEF)
         }
-        val tintColor = shiftTint(shift)
+        val isOff = shift == ShiftType.OFF
 
         Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .cornerRadius(6.dp)
-                .background(if (isToday) shift.composeColor else tintColor)
+                .background(if (isToday) Color(0x3342A5F5) else Color.Transparent)
                 .padding(horizontal = 2.dp, vertical = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -175,28 +177,38 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 text = date.dayOfMonth.toString(),
                 style = TextStyle(
                     fontSize = 10.sp,
-                    color = ColorProvider(if (isToday) shift.composeOnColor else numColor),
+                    color = ColorProvider(numColor),
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                 ),
             )
-            Text(
-                text = shift.label,
-                style = TextStyle(
-                    fontSize = if (shift.label.length > 1) 10.sp else 12.sp,
-                    color = ColorProvider(if (isToday) shift.composeOnColor else shift.composeColor),
-                    fontWeight = FontWeight.Bold,
-                ),
-            )
+            if (isOff) {
+                Text(
+                    text = "휴",
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = ColorProvider(shift.composeColor),
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            } else {
+                Box(
+                    modifier = GlanceModifier
+                        .width(20.dp)
+                        .height(20.dp)
+                        .cornerRadius(10.dp)
+                        .background(shift.composeColor),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = shift.label,
+                        style = TextStyle(
+                            fontSize = if (shift.label.length > 1) 9.sp else 11.sp,
+                            color = ColorProvider(shift.composeOnColor),
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+            }
         }
-    }
-
-    /** 위젯에서는 미리 계산된 파스텔 톤 사용 (알파 합성보다 안정적) */
-    private fun shiftTint(type: ShiftType): Color = when (type) {
-        ShiftType.D -> Color(0xFFE3F2FD)
-        ShiftType.DA -> Color(0xFFE0F2F1)
-        ShiftType.A -> Color(0xFFFFF3E0)
-        ShiftType.N -> Color(0xFFEDE7F6)
-        ShiftType.OFF -> Color(0xFFFCE4EC)
-        ShiftType.W -> Color(0xFFE8F5E9)
     }
 }

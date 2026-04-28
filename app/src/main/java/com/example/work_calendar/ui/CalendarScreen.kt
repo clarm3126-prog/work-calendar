@@ -213,7 +213,7 @@ private fun TodayShiftCard(today: LocalDate, shift: ShiftType, onClick: () -> Un
         }
     }
     val countdown = remember(now, shift) { computeShiftStatus(today, shift, now) }
-    val tint = shift.composeColor.copy(alpha = 0.14f)
+    val tint = shift.composeColor.copy(alpha = 0.20f)
 
     Row(
         modifier = Modifier
@@ -303,8 +303,8 @@ private fun WeekHeaderRow() {
     ) {
         WeekHeaders.forEachIndexed { index, label ->
             val color = when (index) {
-                0 -> Color(0xFFD32F2F)
-                6 -> Color(0xFF1976D2)
+                0 -> Color(0xFFEF5350)
+                6 -> Color(0xFF42A5F5)
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
             Text(
@@ -375,15 +375,15 @@ private fun DayCell(
     onClick: () -> Unit,
 ) {
     val dayColor = when (date.dayOfWeek) {
-        DayOfWeek.SUNDAY -> Color(0xFFD32F2F)
-        DayOfWeek.SATURDAY -> Color(0xFF1976D2)
+        DayOfWeek.SUNDAY -> Color(0xFFEF5350)
+        DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
         else -> MaterialTheme.colorScheme.onSurface
     }
     val cellShape = RoundedCornerShape(8.dp)
     val isOff = shift == ShiftType.OFF
     val highlightMod = if (isToday) {
         Modifier
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), cellShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), cellShape)
             .border(1.5.dp, MaterialTheme.colorScheme.primary, cellShape)
     } else Modifier
 

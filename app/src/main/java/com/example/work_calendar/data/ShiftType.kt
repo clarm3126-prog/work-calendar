@@ -18,8 +18,8 @@ enum class ShiftType(
         start = LocalTime.of(8, 30),
         end = LocalTime.of(15, 0),
         endsNextDay = false,
-        color = 0xFF1E88E5,
-        onColor = 0xFFFFFFFF,
+        color = 0xFFFFC107,
+        onColor = 0xFF212121,
     ),
     DA(
         label = "DA",
@@ -27,8 +27,8 @@ enum class ShiftType(
         start = LocalTime.of(8, 30),
         end = LocalTime.of(20, 30),
         endsNextDay = false,
-        color = 0xFF00897B,
-        onColor = 0xFFFFFFFF,
+        color = 0xFFFFCA28,
+        onColor = 0xFF212121,
     ),
     A(
         label = "A",
@@ -36,7 +36,7 @@ enum class ShiftType(
         start = LocalTime.of(15, 0),
         end = LocalTime.of(20, 30),
         endsNextDay = false,
-        color = 0xFFEF6C00,
+        color = 0xFF2196F3,
         onColor = 0xFFFFFFFF,
     ),
     N(
@@ -45,7 +45,7 @@ enum class ShiftType(
         start = LocalTime.of(20, 30),
         end = LocalTime.of(8, 30),
         endsNextDay = true,
-        color = 0xFF5E35B1,
+        color = 0xFF424242,
         onColor = 0xFFFFFFFF,
     ),
     OFF(
@@ -54,7 +54,7 @@ enum class ShiftType(
         start = null,
         end = null,
         endsNextDay = false,
-        color = 0xFFEC407A,
+        color = 0xFFE53935,
         onColor = 0xFFFFFFFF,
     ),
     W(
@@ -63,8 +63,8 @@ enum class ShiftType(
         start = LocalTime.of(9, 0),
         end = LocalTime.of(18, 0),
         endsNextDay = false,
-        color = 0xFF2E7D32,
-        onColor = 0xFFFFFFFF,
+        color = 0xFF66BB6A,
+        onColor = 0xFF1B1B1B,
     );
 
     val composeColor: Color get() = Color(color)
