@@ -1,0 +1,25 @@
+# Gradle / build outputs
+.gradle/
+/build
+/app/build
+.cxx/
+.externalNativeBuild/
+/captures
+
+# Local config (machine-specific paths)
+local.properties
+*.iml
+
+# Claude Code session-local files
+.claude/
+
+# Android Studio / IntelliJ — keep code style + inspection profiles only
+.idea/*
+!.idea/codeStyles/
+!.idea/codeStyles/**
+!.idea/inspectionProfiles/
+!.idea/inspectionProfiles/**
+
+# OS
+.DS_Store
+Thumbs.db

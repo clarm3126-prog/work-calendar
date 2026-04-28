@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">근무 캘린더</string>
+    <string name="widget_label">근무 캘린더</string>
+    <string name="widget_description">월별 근무 일정을 한눈에 확인합니다.</string>
+</resources>
