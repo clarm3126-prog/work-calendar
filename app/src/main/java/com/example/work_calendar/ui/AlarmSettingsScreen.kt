@@ -156,6 +156,7 @@ private fun ShiftDefaultRow(
 
 private fun defaultPickerTime(type: ShiftType): LocalTime = when (type) {
     ShiftType.D -> LocalTime.of(7, 30)
+    ShiftType.DA -> LocalTime.of(7, 30)
     ShiftType.A -> LocalTime.of(14, 0)
     ShiftType.N -> LocalTime.of(19, 0)
     ShiftType.W -> LocalTime.of(8, 0)

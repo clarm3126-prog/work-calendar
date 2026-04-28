@@ -26,6 +26,8 @@ data class ShiftAlarmDefaults(
 
     companion object {
         /** 알림 기본값을 설정할 수 있는 근무 종류 (휴무 제외) */
-        val configurableTypes: List<ShiftType> = listOf(ShiftType.D, ShiftType.A, ShiftType.N, ShiftType.W)
+        val configurableTypes: List<ShiftType> = listOf(
+            ShiftType.D, ShiftType.DA, ShiftType.A, ShiftType.N, ShiftType.W,
+        )
     }
 }

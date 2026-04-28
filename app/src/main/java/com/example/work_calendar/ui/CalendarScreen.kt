@@ -1,6 +1,7 @@
 package com.example.work_calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,13 +38,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.work_calendar.data.DayEntry
 import com.example.work_calendar.data.ShiftType
+import kotlinx.coroutines.delay
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val MonthFormatter = DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN)
+private val TodayDateFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
 private val WeekHeaders = listOf("일", "월", "화", "수", "목", "금", "토")
 
 @Composable
@@ -69,6 +76,11 @@ fun CalendarScreen(
             state = updateState,
             onUpdate = { viewModel.startUpdate() },
             onDismiss = { viewModel.dismissUpdate() },
+        )
+        TodayShiftCard(
+            today = LocalDate.now(),
+            shift = viewModel.resolvedShift(LocalDate.now(), state.entries),
+            onClick = { selectedDate = LocalDate.now() },
         )
         WeekHeaderRow()
         MonthGrid(
@@ -120,6 +132,7 @@ private fun CalendarTopBar(
                 Text(
                     text = month.format(MonthFormatter),
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "오늘",
@@ -152,11 +165,102 @@ private fun CalendarTopBar(
 }
 
 @Composable
+private fun TodayShiftCard(today: LocalDate, shift: ShiftType, onClick: () -> Unit) {
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = LocalDateTime.now()
+        }
+    }
+    val countdown = remember(now, shift) { computeShiftStatus(today, shift, now) }
+    val tint = if (shift == ShiftType.OFF) Color(0xFFF5F5F5) else shift.composeColor.copy(alpha = 0.12f)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(tint)
+            .clickable { onClick() }
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(shift.composeColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = shift.label,
+                color = shift.composeOnColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (shift.label.length > 1) 20.sp else 26.sp,
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "오늘 · ${today.format(TodayDateFormatter)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = shift.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = if (shift == ShiftType.OFF) "오늘은 휴무입니다." else shift.timeRangeText(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (countdown.isNotEmpty()) {
+                Text(
+                    text = countdown,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = shift.composeColor,
+                )
+            }
+        }
+    }
+}
+
+private fun computeShiftStatus(today: LocalDate, shift: ShiftType, now: LocalDateTime): String {
+    if (shift.start == null || shift.end == null) return ""
+    val start = LocalDateTime.of(today, shift.start)
+    val end = if (shift.endsNextDay) {
+        LocalDateTime.of(today.plusDays(1), shift.end)
+    } else {
+        LocalDateTime.of(today, shift.end)
+    }
+    return when {
+        now.isBefore(start) -> "시작까지 ${formatDuration(Duration.between(now, start))}"
+        now.isAfter(end) -> "오늘 근무 종료"
+        else -> "근무 중 · ${formatDuration(Duration.between(now, end))} 후 종료"
+    }
+}
+
+private fun formatDuration(d: Duration): String {
+    val total = d.toMinutes().coerceAtLeast(0)
+    val hours = total / 60
+    val minutes = total % 60
+    return when {
+        hours > 0 && minutes > 0 -> "${hours}시간 ${minutes}분"
+        hours > 0 -> "${hours}시간"
+        else -> "${minutes}분"
+    }
+}
+
+@Composable
 private fun WeekHeaderRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         WeekHeaders.forEachIndexed { index, label ->
             val color = when (index) {
@@ -190,7 +294,7 @@ private fun MonthGrid(
     val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
     val today = LocalDate.now()
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)) {
         var cell = 0
         while (cell < totalCells) {
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -200,7 +304,7 @@ private fun MonthGrid(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .aspectRatio(0.85f)
+                            .aspectRatio(0.78f)
                             .padding(2.dp),
                     ) {
                         if (date != null) {
@@ -236,41 +340,59 @@ private fun DayCell(
         DayOfWeek.SATURDAY -> Color(0xFF1976D2)
         else -> MaterialTheme.colorScheme.onSurface
     }
-    val borderShape = RoundedCornerShape(10.dp)
-    val highlight = if (isToday) {
-        Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), borderShape)
+    val cellShape = RoundedCornerShape(10.dp)
+    val isOff = shift == ShiftType.OFF
+    val tint = if (isOff) Color(0xFFF5F5F5) else shift.composeColor.copy(alpha = 0.14f)
+    val labelColor = if (isOff) Color(0xFF9E9E9E) else shift.composeColor
+    val borderMod = if (isToday) {
+        Modifier.border(2.dp, shift.composeColor, cellShape)
     } else Modifier
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .clip(borderShape)
-            .then(highlight)
+            .clip(cellShape)
+            .background(tint)
+            .then(borderMod)
             .clickable { onClick() }
-            .padding(4.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = date.dayOfMonth.toString(),
-            color = dayColor,
-            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
-            fontSize = 13.sp,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .background(shift.composeColor)
-                .padding(vertical = 2.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
         ) {
-            Text(
-                text = shift.label,
-                color = shift.composeOnColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-            )
+            if (isToday) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(shift.composeColor),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = date.dayOfMonth.toString(),
+                        color = shift.composeOnColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            } else {
+                Text(
+                    text = date.dayOfMonth.toString(),
+                    color = dayColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
+        Text(
+            text = shift.label,
+            color = labelColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (shift.label.length > 1) 14.sp else 18.sp,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             if (entry?.memo?.isNotBlank() == true) {
                 Dot(color = Color(0xFF8E24AA))
@@ -278,7 +400,7 @@ private fun DayCell(
             if (hasAlarm) {
                 Dot(color = Color(0xFFFB8C00))
             }
-            Spacer(modifier = Modifier.size(0.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

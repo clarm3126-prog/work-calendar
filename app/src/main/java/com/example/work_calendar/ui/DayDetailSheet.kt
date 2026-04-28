@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -85,7 +87,7 @@ fun DayDetailSheet(
                     onClick = onConvertAaToDa,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("이번 AA 짝을 DA로 변경")
+                    Text("이번 AA 짝을 DA로 (첫날 D + 둘째날 A)")
                 }
             }
             ShiftPicker(
@@ -166,6 +168,7 @@ private fun SectionTitle(text: String) {
     Text(text = text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ShiftPicker(
     current: ShiftType,
@@ -175,7 +178,11 @@ private fun ShiftPicker(
     isOverridden: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 3,
+        ) {
             ShiftType.values().forEach { type ->
                 ShiftChip(
                     type = type,

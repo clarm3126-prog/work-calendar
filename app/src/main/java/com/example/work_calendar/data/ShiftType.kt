@@ -18,7 +18,16 @@ enum class ShiftType(
         start = LocalTime.of(8, 30),
         end = LocalTime.of(15, 0),
         endsNextDay = false,
-        color = 0xFF1976D2,
+        color = 0xFF1E88E5,
+        onColor = 0xFFFFFFFF,
+    ),
+    DA(
+        label = "DA",
+        displayName = "주간+오후 (D+A)",
+        start = LocalTime.of(8, 30),
+        end = LocalTime.of(20, 30),
+        endsNextDay = false,
+        color = 0xFF00897B,
         onColor = 0xFFFFFFFF,
     ),
     A(
@@ -45,7 +54,7 @@ enum class ShiftType(
         start = null,
         end = null,
         endsNextDay = false,
-        color = 0xFFE0E0E0,
+        color = 0xFFBDBDBD,
         onColor = 0xFF424242,
     ),
     W(
