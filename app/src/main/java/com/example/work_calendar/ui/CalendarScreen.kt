@@ -451,13 +451,16 @@ private fun MemoChip(memo: String) {
     Text(
         text = memo,
         modifier = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(3.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-            .padding(horizontal = 3.dp, vertical = 1.dp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            .background(Color.White)
+            .padding(horizontal = 2.dp, vertical = 1.dp),
+        color = Color.Black,
         fontSize = 9.sp,
         fontWeight = FontWeight.Medium,
-        maxLines = 1,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        lineHeight = 11.sp,
     )
 }
