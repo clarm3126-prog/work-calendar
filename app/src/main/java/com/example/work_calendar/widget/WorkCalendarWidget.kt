@@ -65,7 +65,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(Color(0xFF000000))
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
                 .clickable(actionStartActivity<MainActivity>()),
         ) {
             Header(month = month, today = today)
@@ -79,7 +79,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val monthText = month.format(DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN))
         val todayText = today.format(DateTimeFormatter.ofPattern("M.d (E)", Locale.KOREAN))
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
+            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -87,14 +87,14 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.defaultWeight(),
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 16.sp,
                     color = ColorProvider(Color(0xFFEFEFEF)),
                 ),
             )
             Text(
                 text = todayText,
                 style = TextStyle(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = ColorProvider(Color(0xFFBDBDBD)),
                     fontWeight = FontWeight.Medium,
                 ),
@@ -105,7 +105,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
     @Composable
     private fun WeekHeader() {
         val labels = listOf("일", "월", "화", "수", "목", "금", "토")
-        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 2.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp)) {
             labels.forEachIndexed { index, label ->
                 val color = when (index) {
                     0 -> ColorProvider(Color(0xFFEF5350))
@@ -118,7 +118,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 ) {
                     Text(
                         text = label,
-                        style = TextStyle(fontSize = 9.sp, color = color, fontWeight = FontWeight.Medium),
+                        style = TextStyle(fontSize = 11.sp, color = color, fontWeight = FontWeight.Medium),
                     )
                 }
             }
@@ -133,9 +133,14 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
 
-        Column(modifier = GlanceModifier.fillMaxWidth()) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
             for (row in 0 until rows) {
-                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                Row(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .defaultWeight()
+                        .padding(vertical = 2.dp),
+                ) {
                     for (col in 0 until 7) {
                         val cell = row * 7 + col
                         val dayNumber = cell - leadingEmpty + 1
@@ -167,16 +172,16 @@ class WorkCalendarWidget : GlanceAppWidget() {
 
         Column(
             modifier = GlanceModifier
-                .fillMaxWidth()
-                .cornerRadius(6.dp)
+                .fillMaxSize()
+                .cornerRadius(8.dp)
                 .background(if (isToday) Color(0x3342A5F5) else Color.Transparent)
-                .padding(horizontal = 2.dp, vertical = 3.dp),
+                .padding(horizontal = 2.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
                 style = TextStyle(
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = ColorProvider(numColor),
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                 ),
@@ -185,7 +190,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 Text(
                     text = "휴",
                     style = TextStyle(
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         color = ColorProvider(shift.composeColor),
                         fontWeight = FontWeight.Medium,
                     ),
@@ -193,16 +198,16 @@ class WorkCalendarWidget : GlanceAppWidget() {
             } else {
                 Box(
                     modifier = GlanceModifier
-                        .width(20.dp)
-                        .height(20.dp)
-                        .cornerRadius(10.dp)
+                        .width(26.dp)
+                        .height(26.dp)
+                        .cornerRadius(13.dp)
                         .background(shift.composeColor),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = shift.label,
                         style = TextStyle(
-                            fontSize = if (shift.label.length > 1) 9.sp else 11.sp,
+                            fontSize = if (shift.label.length > 1) 11.sp else 13.sp,
                             color = ColorProvider(shift.composeOnColor),
                             fontWeight = FontWeight.Bold,
                         ),
