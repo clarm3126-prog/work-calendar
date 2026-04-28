@@ -19,6 +19,7 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -160,6 +161,9 @@ class WorkCalendarWidget : GlanceAppWidget() {
                                 val shift = entries[date.toString()]?.overrideShift()
                                     ?: ShiftSchedule.cycleShift(date)
                                 WidgetDayCell(date = date, shift = shift, isToday = date == today)
+                            } else {
+                                // 빈 칸도 본인의 검정 bg를 그리도록 placeholder
+                                Spacer(modifier = GlanceModifier.fillMaxSize())
                             }
                         }
                     }
