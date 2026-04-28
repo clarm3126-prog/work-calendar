@@ -54,8 +54,8 @@ enum class ShiftType(
         start = null,
         end = null,
         endsNextDay = false,
-        color = 0xFFBDBDBD,
-        onColor = 0xFF424242,
+        color = 0xFFEC407A,
+        onColor = 0xFFFFFFFF,
     ),
     W(
         label = "W",

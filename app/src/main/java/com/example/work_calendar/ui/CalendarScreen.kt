@@ -174,7 +174,7 @@ private fun TodayShiftCard(today: LocalDate, shift: ShiftType, onClick: () -> Un
         }
     }
     val countdown = remember(now, shift) { computeShiftStatus(today, shift, now) }
-    val tint = if (shift == ShiftType.OFF) Color(0xFFF5F5F5) else shift.composeColor.copy(alpha = 0.12f)
+    val tint = shift.composeColor.copy(alpha = 0.14f)
 
     Row(
         modifier = Modifier
@@ -341,9 +341,8 @@ private fun DayCell(
         else -> MaterialTheme.colorScheme.onSurface
     }
     val cellShape = RoundedCornerShape(10.dp)
-    val isOff = shift == ShiftType.OFF
-    val tint = if (isOff) Color(0xFFF5F5F5) else shift.composeColor.copy(alpha = 0.14f)
-    val labelColor = if (isOff) Color(0xFF9E9E9E) else shift.composeColor
+    val tint = shift.composeColor.copy(alpha = 0.18f)
+    val labelColor = shift.composeColor
     val borderMod = if (isToday) {
         Modifier.border(2.dp, shift.composeColor, cellShape)
     } else Modifier
