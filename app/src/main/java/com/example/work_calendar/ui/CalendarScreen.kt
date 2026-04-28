@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.work_calendar.data.DayEntry
@@ -342,7 +343,7 @@ private fun MonthGrid(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .aspectRatio(0.78f)
+                            .aspectRatio(0.7f)
                             .padding(2.dp),
                     ) {
                         if (date != null) {
@@ -378,76 +379,85 @@ private fun DayCell(
         DayOfWeek.SATURDAY -> Color(0xFF1976D2)
         else -> MaterialTheme.colorScheme.onSurface
     }
-    val cellShape = RoundedCornerShape(10.dp)
-    val tint = shift.composeColor.copy(alpha = 0.18f)
-    val labelColor = shift.composeColor
-    val borderMod = if (isToday) {
-        Modifier.border(2.dp, shift.composeColor, cellShape)
+    val cellShape = RoundedCornerShape(8.dp)
+    val isOff = shift == ShiftType.OFF
+    val highlightMod = if (isToday) {
+        Modifier
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), cellShape)
+            .border(1.5.dp, MaterialTheme.colorScheme.primary, cellShape)
     } else Modifier
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .clip(cellShape)
-            .background(tint)
-            .then(borderMod)
+            .then(highlightMod)
             .clickable { onClick() }
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(top = 4.dp, bottom = 3.dp, start = 1.dp, end = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            if (isToday) {
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(shift.composeColor),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = date.dayOfMonth.toString(),
-                        color = shift.composeOnColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            } else {
-                Text(
-                    text = date.dayOfMonth.toString(),
-                    color = dayColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
         Text(
-            text = shift.label,
-            color = labelColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = if (shift.label.length > 1) 14.sp else 18.sp,
+            text = date.dayOfMonth.toString(),
+            color = dayColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            if (entry?.memo?.isNotBlank() == true) {
-                Dot(color = Color(0xFF8E24AA))
-            }
-            if (hasAlarm) {
-                Dot(color = Color(0xFFFB8C00))
-            }
-            Spacer(modifier = Modifier.height(4.dp))
+        if (isOff) {
+            Text(
+                text = "휴",
+                color = shift.composeColor,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        } else {
+            ShiftBadge(shift = shift)
+        }
+        val memo = entry?.memo?.takeIf { it.isNotBlank() }
+        if (memo != null) {
+            MemoChip(memo)
+        }
+        if (hasAlarm) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFB8C00)),
+            )
         }
     }
 }
 
 @Composable
-private fun Dot(color: Color) {
+private fun ShiftBadge(shift: ShiftType) {
     Box(
         modifier = Modifier
-            .size(5.dp)
+            .size(26.dp)
             .clip(CircleShape)
-            .background(color),
+            .background(shift.composeColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = shift.label,
+            color = shift.composeOnColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (shift.label.length > 1) 11.sp else 13.sp,
+        )
+    }
+}
+
+@Composable
+private fun MemoChip(memo: String) {
+    Text(
+        text = memo,
+        modifier = Modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            .padding(horizontal = 3.dp, vertical = 1.dp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
