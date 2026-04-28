@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
@@ -45,7 +47,17 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
+
+private const val PAGER_BASE_INDEX = 600   // ~50년 양방향 = 1200개 페이지
+private const val PAGER_TOTAL_PAGES = 1200
+
+private fun pageToMonth(base: YearMonth, page: Int): YearMonth =
+    base.plusMonths((page - PAGER_BASE_INDEX).toLong())
+
+private fun monthsBetween(from: YearMonth, to: YearMonth): Int =
+    ChronoUnit.MONTHS.between(from, to).toInt()
 
 private val MonthFormatter = DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN)
 private val TodayDateFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
@@ -60,6 +72,26 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    val baseMonth = remember { YearMonth.now() }
+    val pagerState = rememberPagerState(
+        initialPage = PAGER_BASE_INDEX + monthsBetween(baseMonth, state.month),
+        pageCount = { PAGER_TOTAL_PAGES },
+    )
+
+    // 사용자가 스와이프해 페이지가 정착하면 ViewModel에 반영
+    LaunchedEffect(pagerState.settledPage) {
+        val swipedMonth = pageToMonth(baseMonth, pagerState.settledPage)
+        if (swipedMonth != state.month) viewModel.showMonth(swipedMonth)
+    }
+
+    // 외부(화살표/오늘 버튼)에서 month가 바뀌면 페이저를 그쪽으로 애니메이트
+    LaunchedEffect(state.month) {
+        val targetPage = PAGER_BASE_INDEX + monthsBetween(baseMonth, state.month)
+        if (targetPage != pagerState.currentPage) {
+            pagerState.animateScrollToPage(targetPage)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         CalendarTopBar(
@@ -83,17 +115,23 @@ fun CalendarScreen(
             onClick = { selectedDate = LocalDate.now() },
         )
         WeekHeaderRow()
-        MonthGrid(
-            month = state.month,
-            entries = state.entries,
-            resolveShift = { date -> viewModel.resolvedShift(date, state.entries) },
-            hasActiveAlarm = { date, shift ->
-                val entry = state.entries[date.toString()]
-                if (entry?.alarmDisabled == true) false
-                else state.defaults.get(shift).enabled && state.defaults.get(shift).time != null
-            },
-            onClick = { selectedDate = it },
-        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            val pageMonth = pageToMonth(baseMonth, page)
+            MonthGrid(
+                month = pageMonth,
+                entries = state.entries,
+                resolveShift = { date -> viewModel.resolvedShift(date, state.entries) },
+                hasActiveAlarm = { date, shift ->
+                    val entry = state.entries[date.toString()]
+                    if (entry?.alarmDisabled == true) false
+                    else state.defaults.get(shift).enabled && state.defaults.get(shift).time != null
+                },
+                onClick = { selectedDate = it },
+            )
+        }
     }
 
     selectedDate?.let { date ->
