@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.work_calendar.data.DayEntry
+import com.example.work_calendar.data.HolidayProvider
 import com.example.work_calendar.data.ShiftType
 import kotlinx.coroutines.delay
 import java.time.DayOfWeek
@@ -241,11 +242,22 @@ private fun TodayShiftCard(today: LocalDate, shift: ShiftType, onClick: () -> Un
             )
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = "오늘 · ${today.format(TodayDateFormatter)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val holidayName = HolidayProvider.nameOf(today)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "오늘 · ${today.format(TodayDateFormatter)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (holidayName != null) {
+                    Text(
+                        text = holidayName,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFEF5350),
+                    )
+                }
+            }
             Text(
                 text = shift.displayName,
                 style = MaterialTheme.typography.titleMedium,
@@ -374,9 +386,11 @@ private fun DayCell(
     isToday: Boolean,
     onClick: () -> Unit,
 ) {
-    val dayColor = when (date.dayOfWeek) {
-        DayOfWeek.SUNDAY -> Color(0xFFEF5350)
-        DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
+    val holidayName = remember(date) { HolidayProvider.nameOf(date) }
+    val isHoliday = holidayName != null
+    val dayColor = when {
+        isHoliday || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
+        date.dayOfWeek == DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
         else -> MaterialTheme.colorScheme.onSurface
     }
     val cellShape = RoundedCornerShape(6.dp)
@@ -416,6 +430,9 @@ private fun DayCell(
         } else {
             ShiftBadge(shift = shift)
         }
+        if (holidayName != null) {
+            HolidayLabel(holidayName)
+        }
         val memo = entry?.memo?.takeIf { it.isNotBlank() }
         if (memo != null) {
             MemoChip(memo)
@@ -429,6 +446,18 @@ private fun DayCell(
             )
         }
     }
+}
+
+@Composable
+private fun HolidayLabel(name: String) {
+    Text(
+        text = name,
+        color = Color(0xFFEF5350),
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

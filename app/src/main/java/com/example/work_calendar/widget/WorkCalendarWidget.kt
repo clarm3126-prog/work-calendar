@@ -31,6 +31,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.work_calendar.MainActivity
 import com.example.work_calendar.data.DayEntry
+import com.example.work_calendar.data.HolidayProvider
 import com.example.work_calendar.data.ShiftRepository
 import com.example.work_calendar.data.ShiftSchedule
 import com.example.work_calendar.data.ShiftType
@@ -174,9 +175,10 @@ class WorkCalendarWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetDayCell(date: LocalDate, shift: ShiftType, isToday: Boolean) {
-        val numColor = when (date.dayOfWeek) {
-            DayOfWeek.SUNDAY -> Color(0xFFEF5350)
-            DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
+        val isHoliday = HolidayProvider.isHoliday(date)
+        val numColor = when {
+            isHoliday || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
+            date.dayOfWeek == DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
             else -> Color(0xFFEFEFEF)
         }
         val isOff = shift == ShiftType.OFF

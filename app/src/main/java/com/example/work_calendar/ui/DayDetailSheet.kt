@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.work_calendar.data.DayEntry
+import com.example.work_calendar.data.HolidayProvider
 import com.example.work_calendar.data.ShiftAlarmDefaults
 import com.example.work_calendar.data.ShiftSchedule
 import com.example.work_calendar.data.ShiftType
@@ -147,6 +148,14 @@ private fun HeaderSection(date: LocalDate, shift: ShiftType, isOverridden: Boole
         }
         Column {
             Text(text = date.format(DateFormatter), style = MaterialTheme.typography.titleMedium)
+            HolidayProvider.nameOf(date)?.let { name ->
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFEF5350),
+                )
+            }
             Text(
                 text = "${shift.displayName} · ${shift.timeRangeText()}",
                 style = MaterialTheme.typography.bodyMedium,
