@@ -344,7 +344,7 @@ private fun MonthGrid(
                         modifier = Modifier
                             .weight(1f)
                             .aspectRatio(0.7f)
-                            .padding(2.dp),
+                            .padding(1.dp),
                     ) {
                         if (date != null) {
                             val shift = resolveShift(date)
@@ -379,13 +379,16 @@ private fun DayCell(
         DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
         else -> MaterialTheme.colorScheme.onSurface
     }
-    val cellShape = RoundedCornerShape(8.dp)
+    val cellShape = RoundedCornerShape(6.dp)
     val isOff = shift == ShiftType.OFF
+    val gridLineColor = Color(0xFF333333)
     val highlightMod = if (isToday) {
         Modifier
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), cellShape)
             .border(1.5.dp, MaterialTheme.colorScheme.primary, cellShape)
-    } else Modifier
+    } else {
+        Modifier.border(0.7.dp, gridLineColor, cellShape)
+    }
 
     Column(
         modifier = Modifier

@@ -133,19 +133,26 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
 
-        Column(modifier = GlanceModifier.fillMaxSize()) {
+        // 부모에 회색 배경을 두고, 각 셀의 1dp 패딩이 회색을 노출시켜 그리드라인을 만든다
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(Color(0xFF2A2A2A)),
+        ) {
             for (row in 0 until rows) {
                 Row(
                     modifier = GlanceModifier
                         .fillMaxWidth()
-                        .defaultWeight()
-                        .padding(vertical = 2.dp),
+                        .defaultWeight(),
                 ) {
                     for (col in 0 until 7) {
                         val cell = row * 7 + col
                         val dayNumber = cell - leadingEmpty + 1
                         Box(
-                            modifier = GlanceModifier.defaultWeight().padding(1.dp),
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .padding(0.5.dp)
+                                .background(Color(0xFF000000)),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (dayNumber in 1..daysInMonth) {
