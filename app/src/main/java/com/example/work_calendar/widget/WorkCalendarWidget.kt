@@ -78,6 +78,16 @@ private fun Context.clearViewedMonth() {
 
 class WorkCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = WorkCalendarWidget()
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        WidgetMidnightRefresher.scheduleNext(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetMidnightRefresher.cancel(context)
+    }
 }
 
 class PrevMonthAction : ActionCallback {

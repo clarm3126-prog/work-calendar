@@ -3,6 +3,7 @@ package com.example.work_calendar.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.work_calendar.widget.WidgetMidnightRefresher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +25,7 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 AlarmRescheduler.rescheduleUpcoming(appContext)
+                WidgetMidnightRefresher.scheduleNext(appContext)
             } finally {
                 pending.finish()
             }
