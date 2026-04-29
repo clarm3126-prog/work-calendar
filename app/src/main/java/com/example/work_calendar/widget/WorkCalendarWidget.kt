@@ -135,11 +135,14 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
 
-        // 부모에 회색 배경을 두고, 각 셀의 1dp 패딩이 회색을 노출시켜 그리드라인을 만든다
+        // 부모 Column에 회색 배경을 두고, 외곽 1dp 패딩 + 각 셀의 1dp 패딩이
+        // 회색을 노출시켜 셀 사이/바깥 모두 1dp 회색 그리드라인을 만든다 (앱과 동일한 0xFF333333)
+        val gridLineColor = Color(0xFF333333)
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(Color(0xFF2A2A2A)),
+                .background(gridLineColor)
+                .padding(1.dp),
         ) {
             for (row in 0 until rows) {
                 Row(
@@ -150,10 +153,13 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     for (col in 0 until 7) {
                         val cell = row * 7 + col
                         val dayNumber = cell - leadingEmpty + 1
+                        // 셀 사이에만 1dp 간격을 둬서 부모의 회색이 그리드라인으로 노출되게 한다
+                        val padEnd = if (col < 6) 1.dp else 0.dp
+                        val padBottom = if (row < rows - 1) 1.dp else 0.dp
                         Box(
                             modifier = GlanceModifier
                                 .defaultWeight()
-                                .padding(0.5.dp)
+                                .padding(end = padEnd, bottom = padBottom)
                                 .background(Color(0xFF000000)),
                             contentAlignment = Alignment.Center,
                         ) {
