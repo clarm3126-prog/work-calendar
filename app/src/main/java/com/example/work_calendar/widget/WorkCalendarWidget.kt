@@ -1,6 +1,8 @@
 package com.example.work_calendar.widget
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -8,6 +10,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -45,6 +48,8 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+const val WIDGET_EXTRA_OPEN_DATE = "open_date"
 
 private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
@@ -279,6 +284,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetDayCell(date: LocalDate, shift: ShiftType, isToday: Boolean) {
+        val context = LocalContext.current
         val isHoliday = HolidayProvider.isHoliday(date)
         val numColor = when {
             isHoliday || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
@@ -287,12 +293,21 @@ class WorkCalendarWidget : GlanceAppWidget() {
         }
         val isOff = shift == ShiftType.OFF
 
+        val openDateIntent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            // 각 날짜별 PendingIntent를 고유화 (filterEquals는 extras를 보지 않음 → data Uri로 분리)
+            data = Uri.parse("workcalendar://date/$date")
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(WIDGET_EXTRA_OPEN_DATE, date.toString())
+        }
+
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .cornerRadius(8.dp)
                 .background(if (isToday) Color(0x3342A5F5) else Color.Transparent)
-                .padding(horizontal = 2.dp, vertical = 4.dp),
+                .padding(horizontal = 2.dp, vertical = 4.dp)
+                .clickable(actionStartActivity(openDateIntent)),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
