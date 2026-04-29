@@ -69,8 +69,6 @@ private val WeekHeaders = listOf("일", "월", "화", "수", "목", "금", "토"
 fun CalendarScreen(
     viewModel: CalendarViewModel,
     onOpenSettings: () -> Unit,
-    pendingOpenDate: LocalDate? = null,
-    onConsumePendingOpenDate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -82,14 +80,6 @@ fun CalendarScreen(
         initialPage = PAGER_BASE_INDEX + monthsBetween(baseMonth, state.month),
         pageCount = { PAGER_TOTAL_PAGES },
     )
-
-    // 위젯에서 날짜가 전달되면 그 달로 이동하고 상세 시트 자동 오픈
-    LaunchedEffect(pendingOpenDate) {
-        val date = pendingOpenDate ?: return@LaunchedEffect
-        viewModel.showMonth(YearMonth.from(date))
-        selectedDate = date
-        onConsumePendingOpenDate()
-    }
 
     // 사용자가 스와이프해 페이지가 정착하면 ViewModel에 반영
     LaunchedEffect(pagerState.settledPage) {
