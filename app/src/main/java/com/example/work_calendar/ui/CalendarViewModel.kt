@@ -6,9 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.work_calendar.alarm.AlarmScheduler
+import com.example.work_calendar.alarm.AlarmRescheduler
 import com.example.work_calendar.data.DayEntry
-import com.example.work_calendar.data.RepoState
 import com.example.work_calendar.data.ShiftAlarmDefault
 import com.example.work_calendar.data.ShiftAlarmDefaults
 import com.example.work_calendar.data.ShiftRepository
@@ -30,8 +29,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
-
-private const val RESCHEDULE_WINDOW_DAYS = 90L
 
 data class CalendarUiState(
     val month: YearMonth,
@@ -67,6 +64,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     init {
         checkForUpdate()
+        // 콜드스타트마다 향후 알람을 다시 등록 — 부팅 후 BootReceiver가 못 미친 경우 보정
+        viewModelScope.launch { AlarmRescheduler.rescheduleUpcoming(application) }
     }
 
     fun showMonth(month: YearMonth) { monthState.value = month }
@@ -164,20 +163,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun rescheduleUpcoming() {
-        val ctx = getApplication<Application>()
-        val state: RepoState = repo.snapshot()
-        val today = LocalDate.now()
-        var date = today.minusDays(1)
-        val end = today.plusDays(RESCHEDULE_WINDOW_DAYS)
-        while (date.isBefore(end)) {
-            AlarmScheduler.cancel(ctx, date)
-            val effective = repo.effectiveAlarmTime(date, state.entries, state.defaults)
-            if (effective != null) {
-                val (shift, time) = effective
-                AlarmScheduler.schedule(ctx, date, time, shift)
-            }
-            date = date.plusDays(1)
-        }
+        AlarmRescheduler.rescheduleUpcoming(getApplication())
     }
 
     companion object {
