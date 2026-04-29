@@ -32,6 +32,12 @@ object AlarmScheduler {
             .toInstant()
             .toEpochMilli()
 
+        // 이미 지난 시각의 알람은 등록하지 않는다.
+        // setExactAndAllowWhileIdle은 과거 시점이면 즉시 발화시키므로,
+        // 근무를 변경하거나 부팅/콜드스타트로 reschedule이 돌 때
+        // 오늘/어제 같은 날의 지난 시각 알람들이 한꺼번에 알림으로 뜨는 현상을 막는다.
+        if (triggerMillis <= System.currentTimeMillis()) return
+
         val pi = buildPendingIntent(context, shiftDate, shift)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
