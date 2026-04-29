@@ -8,12 +8,16 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.update
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -42,8 +46,54 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private const val WIDGET_PREFS = "work_calendar_widget"
+private const val KEY_VIEWED_YEAR = "viewed_year"
+private const val KEY_VIEWED_MONTH = "viewed_month"
+
+private fun Context.viewedMonth(): YearMonth {
+    val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
+    val year = prefs.getInt(KEY_VIEWED_YEAR, 0)
+    val month = prefs.getInt(KEY_VIEWED_MONTH, 0)
+    return if (year > 0 && month in 1..12) YearMonth.of(year, month) else YearMonth.now()
+}
+
+private fun Context.setViewedMonth(yearMonth: YearMonth) {
+    getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE).edit()
+        .putInt(KEY_VIEWED_YEAR, yearMonth.year)
+        .putInt(KEY_VIEWED_MONTH, yearMonth.monthValue)
+        .apply()
+}
+
+private fun Context.clearViewedMonth() {
+    getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE).edit()
+        .remove(KEY_VIEWED_YEAR)
+        .remove(KEY_VIEWED_MONTH)
+        .apply()
+}
+
 class WorkCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = WorkCalendarWidget()
+}
+
+class PrevMonthAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        context.setViewedMonth(context.viewedMonth().minusMonths(1))
+        WorkCalendarWidget().update(context, glanceId)
+    }
+}
+
+class NextMonthAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        context.setViewedMonth(context.viewedMonth().plusMonths(1))
+        WorkCalendarWidget().update(context, glanceId)
+    }
+}
+
+class TodayMonthAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        context.clearViewedMonth()
+        WorkCalendarWidget().update(context, glanceId)
+    }
 }
 
 class WorkCalendarWidget : GlanceAppWidget() {
@@ -51,7 +101,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = ShiftRepository(context)
         val entries = repo.entriesFlow.first()
-        val month = YearMonth.now()
+        val month = context.viewedMonth()
 
         provideContent {
             GlanceTheme {
@@ -84,23 +134,76 @@ class WorkCalendarWidget : GlanceAppWidget() {
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = monthText,
+            // 좌측: '오늘' 버튼 → 현재 월로 점프
+            Box(
                 modifier = GlanceModifier.defaultWeight(),
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = ColorProvider(Color(0xFFEFEFEF)),
-                ),
-            )
-            Text(
-                text = todayText,
-                style = TextStyle(
-                    fontSize = 12.sp,
-                    color = ColorProvider(Color(0xFFBDBDBD)),
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = "오늘",
+                    modifier = GlanceModifier
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .clickable(actionRunCallback<TodayMonthAction>()),
+                    style = TextStyle(
+                        fontSize = 13.sp,
+                        color = ColorProvider(Color(0xFF42A5F5)),
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
+            // 중앙: ‹  YYYY년 M월  ›
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = GlanceModifier
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clickable(actionRunCallback<PrevMonthAction>()),
+                ) {
+                    Text(
+                        text = "‹",
+                        style = TextStyle(
+                            fontSize = 22.sp,
+                            color = ColorProvider(Color(0xFFEFEFEF)),
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+                Text(
+                    text = monthText,
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        color = ColorProvider(Color(0xFFEFEFEF)),
+                        fontWeight = FontWeight.Bold,
+                    ),
+                )
+                Box(
+                    modifier = GlanceModifier
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clickable(actionRunCallback<NextMonthAction>()),
+                ) {
+                    Text(
+                        text = "›",
+                        style = TextStyle(
+                            fontSize = 22.sp,
+                            color = ColorProvider(Color(0xFFEFEFEF)),
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+            }
+            // 우측: 오늘 날짜 (정보용)
+            Box(
+                modifier = GlanceModifier.defaultWeight(),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    text = todayText,
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        color = ColorProvider(Color(0xFFBDBDBD)),
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
         }
     }
 
