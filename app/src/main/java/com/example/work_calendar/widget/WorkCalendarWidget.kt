@@ -135,16 +135,18 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
 
-        // 부모 Column에 회색 배경을 두고, 외곽 1dp 패딩 + 각 셀의 1dp 패딩이
-        // 회색을 노출시켜 셀 사이/바깥 모두 1dp 회색 그리드라인을 만든다 (앱과 동일한 0xFF333333)
+        // 주(週) 사이에만 가로 구분선을 그어 행을 시각적으로 분리한다 (세로선 없음)
         val gridLineColor = Color(0xFF333333)
-        Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(gridLineColor)
-                .padding(1.dp),
-        ) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
             for (row in 0 until rows) {
+                if (row > 0) {
+                    Spacer(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(gridLineColor),
+                    )
+                }
                 Row(
                     modifier = GlanceModifier
                         .fillMaxWidth()
@@ -153,14 +155,8 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     for (col in 0 until 7) {
                         val cell = row * 7 + col
                         val dayNumber = cell - leadingEmpty + 1
-                        // 셀 사이에만 1dp 간격을 둬서 부모의 회색이 그리드라인으로 노출되게 한다
-                        val padEnd = if (col < 6) 1.dp else 0.dp
-                        val padBottom = if (row < rows - 1) 1.dp else 0.dp
                         Box(
-                            modifier = GlanceModifier
-                                .defaultWeight()
-                                .padding(end = padEnd, bottom = padBottom)
-                                .background(Color(0xFF000000)),
+                            modifier = GlanceModifier.defaultWeight(),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (dayNumber in 1..daysInMonth) {
@@ -169,7 +165,6 @@ class WorkCalendarWidget : GlanceAppWidget() {
                                     ?: ShiftSchedule.cycleShift(date)
                                 WidgetDayCell(date = date, shift = shift, isToday = date == today)
                             } else {
-                                // 빈 칸도 본인의 검정 bg를 그리도록 placeholder
                                 Spacer(modifier = GlanceModifier.fillMaxSize())
                             }
                         }
