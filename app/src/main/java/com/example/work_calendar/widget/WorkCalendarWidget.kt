@@ -49,6 +49,37 @@ import java.util.Locale
 private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
+private const val KEY_ENTRIES_REVISION = "entries_revision"
+
+/**
+ * 위젯 receiver 프로세스에 entries를 캐싱.
+ * 월 이동 같은 단순 갱신은 DataStore를 다시 읽지 않고 캐시를 그대로 쓴다.
+ * 메모/오버라이드가 변경되면 WorkCalendarWidgetUpdater가 revision을 올려 다음 갱신에서 재로드.
+ */
+internal object WidgetEntriesCache {
+    @Volatile private var cached: Map<String, DayEntry>? = null
+    @Volatile private var cachedRevision: Int = -1
+
+    suspend fun getOrLoad(context: Context): Map<String, DayEntry> {
+        val current = readRevision(context)
+        cached?.let { if (cachedRevision == current) return it }
+        val fresh = ShiftRepository(context).entriesFlow.first()
+        cached = fresh
+        cachedRevision = current
+        return fresh
+    }
+
+    fun bumpRevision(context: Context) {
+        val prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt(KEY_ENTRIES_REVISION, prefs.getInt(KEY_ENTRIES_REVISION, 0) + 1)
+            .apply()
+    }
+
+    private fun readRevision(context: Context): Int =
+        context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_ENTRIES_REVISION, 0)
+}
 
 private fun Context.viewedMonth(): YearMonth {
     val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
@@ -109,8 +140,7 @@ class TodayMonthAction : ActionCallback {
 class WorkCalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repo = ShiftRepository(context)
-        val entries = repo.entriesFlow.first()
+        val entries = WidgetEntriesCache.getOrLoad(context)
         val month = context.viewedMonth()
 
         provideContent {
@@ -252,8 +282,13 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val rows = totalCells / 7
 
         // 주(週) 사이에만 가로 구분선을 그어 행을 시각적으로 분리한다 (세로선 없음)
+        // MonthGrid 전체에 단일 clickable을 부여 — 셀 단위로 두면 PendingIntent가 30~40개 생겨 위젯 갱신이 느려진다
         val gridLineColor = Color(0xFF333333)
-        Column(modifier = GlanceModifier.fillMaxSize()) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .clickable(actionStartActivity<MainActivity>()),
+        ) {
             for (row in 0 until rows) {
                 if (row > 0) {
                     Spacer(
@@ -305,8 +340,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 .fillMaxSize()
                 .cornerRadius(8.dp)
                 .background(if (isToday) Color(0x3342A5F5) else Color.Transparent)
-                .padding(horizontal = 2.dp, vertical = 4.dp)
-                .clickable(actionStartActivity<MainActivity>()),
+                .padding(horizontal = 2.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
