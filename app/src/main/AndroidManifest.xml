@@ -8,6 +8,13 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
 
     <application
         android:allowBackup="true"
@@ -38,6 +45,31 @@
                 <action android:name="com.example.work_calendar.action.SHIFT_ALARM" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".alarm.AlarmActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.work_calendar.action.ALARM_DISMISS" />
+                <action android:name="com.example.work_calendar.action.ALARM_SNOOZE" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".alarm.AlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Workcalendar.Alarm" />
+
+        <service
+            android:name=".alarm.AlarmSoundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <receiver
             android:name=".alarm.BootReceiver"

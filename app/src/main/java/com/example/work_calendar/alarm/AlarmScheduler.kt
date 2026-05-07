@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.example.work_calendar.MainActivity
 import com.example.work_calendar.data.ShiftType
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -33,12 +34,9 @@ object AlarmScheduler {
             .toEpochMilli()
 
         // 이미 지난 시각의 알람은 등록하지 않는다.
-        // setExactAndAllowWhileIdle은 과거 시점이면 즉시 발화시키므로,
-        // 근무를 변경하거나 부팅/콜드스타트로 reschedule이 돌 때
-        // 오늘/어제 같은 날의 지난 시각 알람들이 한꺼번에 알림으로 뜨는 현상을 막는다.
         if (triggerMillis <= System.currentTimeMillis()) return
 
-        val pi = buildPendingIntent(context, shiftDate, shift)
+        val operationPi = buildOperationPendingIntent(context, shiftDate, shift)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -46,9 +44,12 @@ object AlarmScheduler {
         } else true
 
         if (canExact) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pi)
+            // 시계앱 알람과 동일하게 도즈/절전 모드 무시 + 상태바 다음알람 아이콘 표시.
+            val showPi = buildShowPendingIntent(context, shiftDate)
+            val info = AlarmManager.AlarmClockInfo(triggerMillis, showPi)
+            alarmManager.setAlarmClock(info, operationPi)
         } else {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pi)
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, operationPi)
         }
     }
 
@@ -67,7 +68,7 @@ object AlarmScheduler {
         pi.cancel()
     }
 
-    private fun buildPendingIntent(
+    private fun buildOperationPendingIntent(
         context: Context,
         shiftDate: LocalDate,
         shift: ShiftType,
@@ -79,6 +80,21 @@ object AlarmScheduler {
             putExtra(EXTRA_SHIFT_TIME_RANGE, shift.timeRangeText())
         }
         return PendingIntent.getBroadcast(
+            context,
+            requestCode(shiftDate),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun buildShowPendingIntent(
+        context: Context,
+        shiftDate: LocalDate,
+    ): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        return PendingIntent.getActivity(
             context,
             requestCode(shiftDate),
             intent,

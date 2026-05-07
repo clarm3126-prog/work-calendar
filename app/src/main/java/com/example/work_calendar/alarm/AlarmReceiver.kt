@@ -1,20 +1,22 @@
 package com.example.work_calendar.alarm
 
-import android.Manifest
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
+import android.os.Build
 import androidx.core.content.ContextCompat
-import com.example.work_calendar.MainActivity
-import com.example.work_calendar.R
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/**
+ * 예약된 알람 시각이 되면 호출된다.
+ * 시계앱 알람과 동일하게 동작하도록:
+ *  1) 사용자가 정지/스누즈 누를 때까지 알람음을 유지하는 포그라운드 서비스 시작.
+ *     서비스가 풀스크린 인텐트가 달린 알림을 올려, 잠금화면 위로 AlarmActivity 가 표시된다.
+ *  2) 화면이 켜진 상태(잠금 미동작)에서는 풀스크린 인텐트가 헤드업으로만 뜰 수 있어
+ *     AlarmActivity 를 직접 시작해 즉시 풀스크린 화면을 보장한다.
+ */
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -26,41 +28,25 @@ class AlarmReceiver : BroadcastReceiver() {
         val range = intent.getStringExtra(AlarmScheduler.EXTRA_SHIFT_TIME_RANGE) ?: ""
 
         val date = runCatching { LocalDate.parse(dateStr) }.getOrNull() ?: return
-        val isNightAlarm = label == "N"
-        val title = if (isNightAlarm) "내일 N 근무 알림" else "$label 근무 알림"
         val dateFormat = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
         val text = buildString {
             append(date.format(dateFormat))
             if (range.isNotBlank()) append(" · ").append(range)
         }
 
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val serviceIntent = AlarmSoundService.startIntent(context, dateStr, label, text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } else {
+            context.startService(serviceIntent)
         }
-        val contentPi = PendingIntent.getActivity(
-            context,
-            AlarmScheduler.requestCode(date),
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
 
-        val notification = NotificationCompat.Builder(context, NotificationChannels.SHIFT_ALARM_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(contentPi)
-            .build()
-
-        val canPost = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!canPost) return
-
-        NotificationManagerCompat.from(context)
-            .notify(AlarmScheduler.requestCode(date), notification)
+        // 사용자 사용 중인 단말이라도 풀스크린 화면을 즉시 띄운다.
+        val alarmActivity = AlarmActivity.intent(context, dateStr, label, text).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                Intent.FLAG_ACTIVITY_NO_USER_ACTION
+        }
+        runCatching { context.startActivity(alarmActivity) }
     }
 }
