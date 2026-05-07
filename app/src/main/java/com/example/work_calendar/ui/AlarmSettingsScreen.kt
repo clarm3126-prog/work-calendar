@@ -95,7 +95,6 @@ fun AlarmSettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF5E35B1),
             )
-            HorizontalDivider()
             AlarmPermissionsCard()
             HorizontalDivider()
             ShiftAlarmDefaults.configurableTypes.forEach { type ->
@@ -191,21 +190,22 @@ private fun AlarmPermissionsCard() {
     val canIgnoreBattery = remember(refreshTick) { isIgnoringBatteryOptimizations(context) }
 
     val allGranted = canExact && canFullScreen && canIgnoreBattery
+    if (allGranted) return
+
     val manufacturerHint = remember { manufacturerSpecificHint() }
+    val fg = Color(0xFF6D4C00)
 
-    val bg = if (allGranted) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
-    val fg = if (allGranted) Color(0xFF2E7D32) else Color(0xFF6D4C00)
-
+    HorizontalDivider()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(bg)
+            .background(Color(0xFFFFF3E0))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            if (allGranted) "알람 권한 모두 허용됨" else "근무 알람을 놓치지 않으려면 권한이 필요해요",
+            "근무 알람을 놓치지 않으려면 권한이 필요해요",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = fg,
