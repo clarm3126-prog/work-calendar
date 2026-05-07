@@ -1,5 +1,6 @@
 package com.example.work_calendar.ui
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.app.TimePickerDialog
@@ -7,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -186,28 +188,33 @@ private fun AlarmPermissionsCard() {
 
     val canExact = remember(refreshTick) { canScheduleExactAlarms(context) }
     val canFullScreen = remember(refreshTick) { canUseFullScreenIntent(context) }
+    val canIgnoreBattery = remember(refreshTick) { isIgnoringBatteryOptimizations(context) }
 
-    if (canExact && canFullScreen) return
+    val allGranted = canExact && canFullScreen && canIgnoreBattery
+    val manufacturerHint = remember { manufacturerSpecificHint() }
+
+    val bg = if (allGranted) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+    val fg = if (allGranted) Color(0xFF2E7D32) else Color(0xFF6D4C00)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFFF3E0))
+            .background(bg)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "시계앱처럼 알람이 울리려면 권한이 필요해요",
+            if (allGranted) "알람 권한 모두 허용됨" else "근무 알람을 놓치지 않으려면 권한이 필요해요",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF6D4C00),
+            color = fg,
         )
         if (!canExact) {
             Text(
                 "• 정확한 알람: 정해진 시각에 정확히 울리도록 허용해 주세요.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF6D4C00),
+                color = fg,
             )
             Button(
                 onClick = { openExactAlarmSettings(context) },
@@ -219,12 +226,33 @@ private fun AlarmPermissionsCard() {
             Text(
                 "• 잠금화면 알람: 잠금화면 위에 알람 화면을 띄우려면 허용해 주세요.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF6D4C00),
+                color = fg,
             )
             Button(
                 onClick = { openFullScreenIntentSettings(context) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("잠금화면 알람 권한 열기") }
+        }
+        if (!canIgnoreBattery) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "• 배터리 최적화 제외: 폰이 절전 모드에 들어가도 알람이 울리도록 해주세요. " +
+                    "이게 없으면 알람이 누락되거나 늦게 울릴 수 있어요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = fg,
+            )
+            Button(
+                onClick = { requestIgnoreBatteryOptimizations(context) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("배터리 최적화 제외 허용") }
+        }
+        if (manufacturerHint != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                manufacturerHint,
+                style = MaterialTheme.typography.bodySmall,
+                color = fg,
+            )
         }
     }
 }
@@ -262,6 +290,53 @@ private fun openExactAlarmSettings(context: Context) {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
     runCatching { context.startActivity(intent) }
+}
+
+private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+    return pm.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+@SuppressLint("BatteryLife")
+private fun requestIgnoreBatteryOptimizations(context: Context) {
+    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = Uri.parse("package:${context.packageName}")
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+    val handled = runCatching { context.startActivity(intent) }.isSuccess
+    if (!handled) {
+        // 일부 ROM 은 위 인텐트를 막아둠. 배터리 최적화 목록 화면으로 폴백.
+        val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        runCatching { context.startActivity(fallback) }
+    }
+}
+
+/**
+ * 표준 안드로이드 배터리 최적화 외에 제조사가 별도로 운영하는 절전 정책 안내문.
+ * 자동 처리 불가능한 영역이므로 사용자에게 직접 설정하도록 알려준다.
+ */
+private fun manufacturerSpecificHint(): String? {
+    val m = Build.MANUFACTURER.lowercase()
+    return when {
+        m.contains("samsung") ->
+            "삼성 단말은 추가로 [설정 → 디바이스 케어 → 배터리 → 백그라운드 사용 제한] " +
+                "에서 이 앱을 '잠자기/딥 슬립' 목록에서 제외해야 안전합니다."
+        m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") ->
+            "샤오미/MIUI 단말은 [설정 → 앱 → 권한 → 자동 시작]을 켜고, " +
+                "[배터리 → 앱 배터리 절약 → 제한 없음]으로 설정하세요."
+        m.contains("huawei") || m.contains("honor") ->
+            "화웨이/Honor 단말은 [설정 → 배터리 → 앱 시작 관리]에서 이 앱을 '수동 관리'로 두고 " +
+                "자동 시작/보조 시작/백그라운드 실행을 모두 켜세요."
+        m.contains("oppo") || m.contains("realme") || m.contains("oneplus") ->
+            "오포/리얼미/원플러스(ColorOS) 단말은 [설정 → 배터리 → 앱 배터리 관리]에서 " +
+                "이 앱의 백그라운드 실행을 허용하세요."
+        m.contains("vivo") ->
+            "비보(FuntouchOS) 단말은 [설정 → 배터리 → 백그라운드 전력 소모 관리]에서 " +
+                "이 앱을 허용으로 두세요."
+        else -> null
+    }
 }
 
 private fun openFullScreenIntentSettings(context: Context) {
