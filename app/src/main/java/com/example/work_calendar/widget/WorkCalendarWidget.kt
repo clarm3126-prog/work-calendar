@@ -327,9 +327,9 @@ class WorkCalendarWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetDayCell(date: LocalDate, shift: ShiftType, isToday: Boolean) {
-        val isHoliday = HolidayProvider.isHoliday(date)
+        val holidayName = HolidayProvider.nameOf(date)
         val numColor = when {
-            isHoliday || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
+            holidayName != null || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
             date.dayOfWeek == DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
             else -> Color(0xFFEFEFEF)
         }
@@ -378,6 +378,17 @@ class WorkCalendarWidget : GlanceAppWidget() {
                         ),
                     )
                 }
+            }
+            if (holidayName != null) {
+                Text(
+                    text = holidayName,
+                    style = TextStyle(
+                        fontSize = 9.sp,
+                        color = ColorProvider(Color(0xFFEF5350)),
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    maxLines = 1,
+                )
             }
         }
     }
