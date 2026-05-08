@@ -24,11 +24,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,9 +64,27 @@ fun DayDetailSheet(
     onOpenAlarmSettings: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var memoDraft by remember(date, entry.memo) { mutableStateOf(entry.memo) }
+    // 시트가 같은 날짜에 머무는 동안엔 사용자 입력을 그대로 유지 — date 키만 사용.
+    // entry.memo가 DataStore→여기로 다시 흘러들어와 memoDraft를 덮어쓰면 빠른 입력이 깨진다.
+    var memoDraft by remember(date) { mutableStateOf(entry.memo) }
+    // 키입력 burst마다 setMemo가 5~10번씩 발사되면 위젯 갱신 race가 생기고 Glance가 마지막 갱신을 흘리는 경우가 있음.
+    // 300ms 디바운스로 burst당 한 번만 onMemoChange 호출.
     LaunchedEffect(memoDraft) {
-        if (memoDraft != entry.memo) onMemoChange(memoDraft)
+        if (memoDraft != entry.memo) {
+            delay(300)
+            onMemoChange(memoDraft)
+        }
+    }
+    // 시트가 닫힐 때 디바운스가 미처 발사 못한 마지막 값이 있으면 저장 — 데이터 유실 방지.
+    val draftRef = rememberUpdatedState(memoDraft)
+    val savedRef = rememberUpdatedState(entry.memo)
+    val onMemoChangeRef = rememberUpdatedState(onMemoChange)
+    DisposableEffect(date) {
+        onDispose {
+            if (draftRef.value != savedRef.value) {
+                onMemoChangeRef.value(draftRef.value)
+            }
+        }
     }
 
     val cycleShift = ShiftSchedule.cycleShift(date)

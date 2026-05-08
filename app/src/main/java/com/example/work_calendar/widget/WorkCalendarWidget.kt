@@ -395,34 +395,33 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     }
                 }
             }
-            // 남은 공간을 위로 밀어내 공휴일/메모를 셀 하단에 붙인다 → 모든 셀에서 메모 위치 일관.
-            Spacer(modifier = GlanceModifier.defaultWeight())
-            // 공휴일은 항상 같은 자리(상단 라인)를 차지. 공휴일이 없으면 빈 문자열로 슬롯 자체는 유지 →
-            // Glance가 자식 트리 구조 변동을 다루는 데 약해 메모 칩 추가/삭제가 위젯에 반영 안 되던 문제 회피.
-            Text(
-                text = holidayName.orEmpty(),
-                style = TextStyle(
-                    fontSize = 9.sp,
-                    color = ColorProvider(Color(0xFFEF5350)),
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                ),
-                maxLines = 1,
-            )
-            // 메모도 동일 — 항상 칩을 그리되 비어있을 땐 투명 처리. 구조가 고정이라 텍스트 변경만으로 갱신됨.
-            WidgetMemoChip(memo.orEmpty())
+            // 셀 자연 배치 — Spacer로 하단에 밀어내지 않아 메모가 중앙쯤에 옴.
+            // 공휴일과 메모 둘 다 있으면 공휴일 라벨 위, 메모 아래로 스택.
+            if (holidayName != null) {
+                Text(
+                    text = holidayName,
+                    style = TextStyle(
+                        fontSize = 9.sp,
+                        color = ColorProvider(Color(0xFFEF5350)),
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                    ),
+                    maxLines = 1,
+                )
+            }
+            if (memo != null) {
+                WidgetMemoChip(memo)
+            }
         }
     }
 
     @Composable
     private fun WidgetMemoChip(memo: String) {
-        // 메모가 비어있으면 투명 — 칩 자체는 트리에 남아있어 Glance diff가 안정적.
-        val hasMemo = memo.isNotEmpty()
         Box(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .cornerRadius(3.dp)
-                .background(if (hasMemo) Color.White else Color.Transparent)
+                .background(Color.White)
                 .padding(horizontal = 2.dp, vertical = 1.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -430,7 +429,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 text = memo,
                 style = TextStyle(
                     fontSize = 9.sp,
-                    color = ColorProvider(if (hasMemo) Color(0xFF000000) else Color.Transparent),
+                    color = ColorProvider(Color(0xFF000000)),
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                 ),
