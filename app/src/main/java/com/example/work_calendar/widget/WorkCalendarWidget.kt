@@ -51,25 +51,6 @@ private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
 
-/**
- * 위젯 프로세스(=앱 메인 프로세스) 내 entries 캐시. 월 이동 같은 갱신은 DataStore를 다시 읽지 않는다.
- * 메모/오버라이드가 변경되면 WorkCalendarWidgetUpdater가 invalidate()를 호출해 다음 갱신에서 재로드.
- */
-internal object WidgetEntriesCache {
-    @Volatile private var cached: Map<String, DayEntry>? = null
-
-    suspend fun getOrLoad(context: Context): Map<String, DayEntry> {
-        cached?.let { return it }
-        val fresh = ShiftRepository(context).entriesFlow.first()
-        cached = fresh
-        return fresh
-    }
-
-    fun invalidate() {
-        cached = null
-    }
-}
-
 private fun Context.viewedMonth(): YearMonth {
     val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
     val year = prefs.getInt(KEY_VIEWED_YEAR, 0)
@@ -129,7 +110,9 @@ class TodayMonthAction : ActionCallback {
 class WorkCalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val entries = WidgetEntriesCache.getOrLoad(context)
+        // 캐시 없이 매 갱신마다 DataStore에서 직접 읽는다.
+        // 캐시 도입 시 빠른 setMemo 연속 호출과 invalidate가 race를 일으켜 stale 데이터가 박히던 문제가 있었음.
+        val entries = ShiftRepository(context).entriesFlow.first()
         val month = context.viewedMonth()
 
         provideContent {
