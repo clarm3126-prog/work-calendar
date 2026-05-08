@@ -31,6 +31,7 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.work_calendar.MainActivity
@@ -49,36 +50,24 @@ import java.util.Locale
 private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
-private const val KEY_ENTRIES_REVISION = "entries_revision"
 
 /**
- * 위젯 receiver 프로세스에 entries를 캐싱.
- * 월 이동 같은 단순 갱신은 DataStore를 다시 읽지 않고 캐시를 그대로 쓴다.
- * 메모/오버라이드가 변경되면 WorkCalendarWidgetUpdater가 revision을 올려 다음 갱신에서 재로드.
+ * 위젯 프로세스(=앱 메인 프로세스) 내 entries 캐시. 월 이동 같은 갱신은 DataStore를 다시 읽지 않는다.
+ * 메모/오버라이드가 변경되면 WorkCalendarWidgetUpdater가 invalidate()를 호출해 다음 갱신에서 재로드.
  */
 internal object WidgetEntriesCache {
     @Volatile private var cached: Map<String, DayEntry>? = null
-    @Volatile private var cachedRevision: Int = -1
 
     suspend fun getOrLoad(context: Context): Map<String, DayEntry> {
-        val current = readRevision(context)
-        cached?.let { if (cachedRevision == current) return it }
+        cached?.let { return it }
         val fresh = ShiftRepository(context).entriesFlow.first()
         cached = fresh
-        cachedRevision = current
         return fresh
     }
 
-    fun bumpRevision(context: Context) {
-        val prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putInt(KEY_ENTRIES_REVISION, prefs.getInt(KEY_ENTRIES_REVISION, 0) + 1)
-            .apply()
+    fun invalidate() {
+        cached = null
     }
-
-    private fun readRevision(context: Context): Int =
-        context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_ENTRIES_REVISION, 0)
 }
 
 private fun Context.viewedMonth(): YearMonth {
@@ -363,32 +352,43 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                 ),
             )
-            if (isOff) {
-                Text(
-                    text = "휴",
-                    style = TextStyle(
-                        fontSize = 13.sp,
-                        color = ColorProvider(shift.composeColor),
-                        fontWeight = FontWeight.Medium,
-                    ),
-                )
-            } else {
-                Box(
-                    modifier = GlanceModifier
-                        .width(26.dp)
-                        .height(26.dp)
-                        .cornerRadius(13.dp)
-                        .background(shift.composeColor),
-                    contentAlignment = Alignment.Center,
-                ) {
+            // 휴(텍스트)와 근무 원형(26dp)의 높이가 달라 셀마다 메모 시작 y가 어긋난다.
+            // 슬롯을 26dp 고정으로 통일해 메모/공휴일 라벨이 항상 같은 위치에 오도록 함.
+            Box(
+                modifier = GlanceModifier
+                    .height(26.dp)
+                    .width(26.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isOff) {
                     Text(
-                        text = shift.label,
+                        text = "휴",
                         style = TextStyle(
-                            fontSize = if (shift.label.length > 1) 11.sp else 13.sp,
-                            color = ColorProvider(shift.composeOnColor),
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = ColorProvider(shift.composeColor),
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
                         ),
                     )
+                } else {
+                    Box(
+                        modifier = GlanceModifier
+                            .width(26.dp)
+                            .height(26.dp)
+                            .cornerRadius(13.dp)
+                            .background(shift.composeColor),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = shift.label,
+                            style = TextStyle(
+                                fontSize = if (shift.label.length > 1) 11.sp else 13.sp,
+                                color = ColorProvider(shift.composeOnColor),
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                            ),
+                        )
+                    }
                 }
             }
             // 셀 높이가 좁아 메모와 공휴일 이름을 같이 그리면 메모가 잘린다.
@@ -401,6 +401,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                         fontSize = 9.sp,
                         color = ColorProvider(Color(0xFFEF5350)),
                         fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
                     ),
                     maxLines = 1,
                 )
@@ -424,6 +425,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     fontSize = 9.sp,
                     color = ColorProvider(Color(0xFF000000)),
                     fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
                 ),
                 maxLines = 2,
             )
