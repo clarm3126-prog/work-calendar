@@ -24,14 +24,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,28 +60,9 @@ fun DayDetailSheet(
     onOpenAlarmSettings: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // 시트가 같은 날짜에 머무는 동안엔 사용자 입력을 그대로 유지 — date 키만 사용.
-    // entry.memo가 DataStore→여기로 다시 흘러들어와 memoDraft를 덮어쓰면 빠른 입력이 깨진다.
-    var memoDraft by remember(date) { mutableStateOf(entry.memo) }
-    // 키입력 burst마다 setMemo가 5~10번씩 발사되면 위젯 갱신 race가 생기고 Glance가 마지막 갱신을 흘리는 경우가 있음.
-    // 300ms 디바운스로 burst당 한 번만 onMemoChange 호출.
-    LaunchedEffect(memoDraft) {
-        if (memoDraft != entry.memo) {
-            delay(300)
-            onMemoChange(memoDraft)
-        }
-    }
-    // 시트가 닫힐 때 디바운스가 미처 발사 못한 마지막 값이 있으면 저장 — 데이터 유실 방지.
-    val draftRef = rememberUpdatedState(memoDraft)
-    val savedRef = rememberUpdatedState(entry.memo)
-    val onMemoChangeRef = rememberUpdatedState(onMemoChange)
-    DisposableEffect(date) {
-        onDispose {
-            if (draftRef.value != savedRef.value) {
-                onMemoChangeRef.value(draftRef.value)
-            }
-        }
-    }
+    // 자동 저장 안 함 — 사용자가 명시적으로 저장/삭제 버튼을 눌러야 DataStore와 위젯에 반영.
+    // 화면이 다른 날짜로 바뀌거나 외부에서 entry.memo가 갱신되면 draft도 그에 맞춰 초기화.
+    var memoDraft by remember(date, entry.memo) { mutableStateOf(entry.memo) }
 
     val cycleShift = ShiftSchedule.cycleShift(date)
     val isOverridden = entry.overrideShift() != null
@@ -134,6 +111,32 @@ fun DayDetailSheet(
                 minLines = 2,
                 maxLines = 6,
             )
+            // 저장: 현재 입력값을 DataStore에 쓰고 위젯 갱신.
+            // 삭제: 메모를 비워서 DataStore에서 키가 제거되도록 함.
+            val draftChanged = memoDraft != entry.memo
+            val hasSavedMemo = entry.memo.isNotBlank()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        memoDraft = ""
+                        onMemoChange("")
+                    },
+                    enabled = hasSavedMemo || memoDraft.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("삭제")
+                }
+                Button(
+                    onClick = { onMemoChange(memoDraft) },
+                    enabled = draftChanged,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("저장")
+                }
+            }
 
             HorizontalDivider()
 
