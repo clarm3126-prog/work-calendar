@@ -41,8 +41,6 @@ import com.example.work_calendar.data.ShiftRepository
 import com.example.work_calendar.data.ShiftSchedule
 import com.example.work_calendar.data.ShiftType
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -54,24 +52,15 @@ private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
 
 /**
- * entries 캐시. 월 이동 시 DataStore 재읽기를 막아 갱신을 빠르게 한다.
- * Mutex로 invalidate와 load를 직렬화해 race(stale 데이터 캐시 박힘)를 방지.
+ * 캐시 없는 호환 표면 — 위젯 갱신 안정성을 우선해 항상 DataStore에서 직접 읽는다.
+ * invalidate()는 외부 호출자(WorkCalendarWidgetUpdater)와의 호환을 위해 남겨둔 no-op.
  */
 internal object WidgetEntriesCache {
-    @Volatile private var cached: Map<String, DayEntry>? = null
-    private val mutex = Mutex()
+    suspend fun getOrLoad(context: Context): Map<String, DayEntry> =
+        ShiftRepository(context).entriesFlow.first()
 
-    suspend fun getOrLoad(context: Context): Map<String, DayEntry> = mutex.withLock {
-        cached ?: run {
-            val fresh = ShiftRepository(context).entriesFlow.first()
-            cached = fresh
-            fresh
-        }
-    }
-
-    suspend fun invalidate() = mutex.withLock {
-        cached = null
-    }
+    @Suppress("RedundantSuspendModifier")
+    suspend fun invalidate() = Unit
 }
 
 private fun Context.viewedMonth(): YearMonth {
