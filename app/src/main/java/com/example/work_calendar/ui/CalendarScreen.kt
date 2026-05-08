@@ -430,12 +430,12 @@ private fun DayCell(
         } else {
             ShiftBadge(shift = shift)
         }
-        if (holidayName != null) {
-            HolidayLabel(holidayName)
-        }
+        // 셀 높이가 좁아 공휴일 이름과 메모를 같이 띄우면 메모가 잘린다.
+        // 메모가 있으면 메모를 우선 노출 — 공휴일임은 빨간 숫자/탭 상세시트로 확인 가능.
         val memo = entry?.memo?.takeIf { it.isNotBlank() }
-        if (memo != null) {
-            MemoChip(memo)
+        when {
+            memo != null -> MemoChip(memo)
+            holidayName != null -> HolidayLabel(holidayName)
         }
         if (hasAlarm) {
             Box(
