@@ -41,6 +41,8 @@ import com.example.work_calendar.data.ShiftRepository
 import com.example.work_calendar.data.ShiftSchedule
 import com.example.work_calendar.data.ShiftType
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -50,6 +52,27 @@ import java.util.Locale
 private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
+
+/**
+ * entries 캐시. 월 이동 시 DataStore 재읽기를 막아 갱신을 빠르게 한다.
+ * Mutex로 invalidate와 load를 직렬화해 race(stale 데이터 캐시 박힘)를 방지.
+ */
+internal object WidgetEntriesCache {
+    @Volatile private var cached: Map<String, DayEntry>? = null
+    private val mutex = Mutex()
+
+    suspend fun getOrLoad(context: Context): Map<String, DayEntry> = mutex.withLock {
+        cached ?: run {
+            val fresh = ShiftRepository(context).entriesFlow.first()
+            cached = fresh
+            fresh
+        }
+    }
+
+    suspend fun invalidate() = mutex.withLock {
+        cached = null
+    }
+}
 
 private fun Context.viewedMonth(): YearMonth {
     val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
@@ -110,9 +133,7 @@ class TodayMonthAction : ActionCallback {
 class WorkCalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // 캐시 없이 매 갱신마다 DataStore에서 직접 읽는다.
-        // 캐시 도입 시 빠른 setMemo 연속 호출과 invalidate가 race를 일으켜 stale 데이터가 박히던 문제가 있었음.
-        val entries = ShiftRepository(context).entriesFlow.first()
+        val entries = WidgetEntriesCache.getOrLoad(context)
         val month = context.viewedMonth()
 
         provideContent {
@@ -374,31 +395,34 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     }
                 }
             }
-            // 셀 높이가 좁아 메모와 공휴일 이름을 같이 그리면 메모가 잘린다.
-            // 앱 셀과 동일하게 메모 우선 — 공휴일은 빨간 숫자로 식별 가능.
-            when {
-                memo != null -> WidgetMemoChip(memo)
-                holidayName != null -> Text(
-                    text = holidayName,
-                    style = TextStyle(
-                        fontSize = 9.sp,
-                        color = ColorProvider(Color(0xFFEF5350)),
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                    ),
-                    maxLines = 1,
-                )
-            }
+            // 남은 공간을 위로 밀어내 공휴일/메모를 셀 하단에 붙인다 → 모든 셀에서 메모 위치 일관.
+            Spacer(modifier = GlanceModifier.defaultWeight())
+            // 공휴일은 항상 같은 자리(상단 라인)를 차지. 공휴일이 없으면 빈 문자열로 슬롯 자체는 유지 →
+            // Glance가 자식 트리 구조 변동을 다루는 데 약해 메모 칩 추가/삭제가 위젯에 반영 안 되던 문제 회피.
+            Text(
+                text = holidayName.orEmpty(),
+                style = TextStyle(
+                    fontSize = 9.sp,
+                    color = ColorProvider(Color(0xFFEF5350)),
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                ),
+                maxLines = 1,
+            )
+            // 메모도 동일 — 항상 칩을 그리되 비어있을 땐 투명 처리. 구조가 고정이라 텍스트 변경만으로 갱신됨.
+            WidgetMemoChip(memo.orEmpty())
         }
     }
 
     @Composable
     private fun WidgetMemoChip(memo: String) {
+        // 메모가 비어있으면 투명 — 칩 자체는 트리에 남아있어 Glance diff가 안정적.
+        val hasMemo = memo.isNotEmpty()
         Box(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .cornerRadius(3.dp)
-                .background(Color.White)
+                .background(if (hasMemo) Color.White else Color.Transparent)
                 .padding(horizontal = 2.dp, vertical = 1.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -406,7 +430,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 text = memo,
                 style = TextStyle(
                     fontSize = 9.sp,
-                    color = ColorProvider(Color(0xFF000000)),
+                    color = ColorProvider(if (hasMemo) Color(0xFF000000) else Color.Transparent),
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                 ),

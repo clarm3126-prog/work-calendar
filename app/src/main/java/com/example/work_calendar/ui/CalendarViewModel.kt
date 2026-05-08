@@ -18,6 +18,7 @@ import com.example.work_calendar.update.UpdateChecker
 import com.example.work_calendar.update.UpdateInfo
 import com.example.work_calendar.update.UpdateInstaller
 import com.example.work_calendar.widget.WorkCalendarWidgetUpdater
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
@@ -75,25 +77,32 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun setOverride(date: LocalDate, type: ShiftType?) {
         viewModelScope.launch {
-            repo.setOverride(date, type)
+            // 시트/액티비티가 닫혀 viewModelScope가 취소돼도 쓰기·위젯 갱신이 누락되지 않도록 보호.
+            withContext(NonCancellable) {
+                repo.setOverride(date, type)
+                widgetUpdater.update()
+            }
             rescheduleUpcoming()
-            widgetUpdater.update()
         }
     }
 
     fun convertAaPairToDa(date: LocalDate) {
         val firstA = ShiftSchedule.firstAOfPair(date) ?: return
         viewModelScope.launch {
-            repo.setOverride(firstA, ShiftType.D)
+            withContext(NonCancellable) {
+                repo.setOverride(firstA, ShiftType.D)
+                widgetUpdater.update()
+            }
             rescheduleUpcoming()
-            widgetUpdater.update()
         }
     }
 
     fun setMemo(date: LocalDate, memo: String) {
         viewModelScope.launch {
-            repo.setMemo(date, memo)
-            widgetUpdater.update()
+            withContext(NonCancellable) {
+                repo.setMemo(date, memo)
+                widgetUpdater.update()
+            }
         }
     }
 
