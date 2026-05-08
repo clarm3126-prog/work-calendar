@@ -312,9 +312,16 @@ class WorkCalendarWidget : GlanceAppWidget() {
                         ) {
                             if (dayNumber in 1..daysInMonth) {
                                 val date = month.atDay(dayNumber)
-                                val shift = entries[date.toString()]?.overrideShift()
+                                val entry = entries[date.toString()]
+                                val shift = entry?.overrideShift()
                                     ?: ShiftSchedule.cycleShift(date)
-                                WidgetDayCell(date = date, shift = shift, isToday = date == today)
+                                val memo = entry?.memo?.takeIf { it.isNotBlank() }
+                                WidgetDayCell(
+                                    date = date,
+                                    shift = shift,
+                                    isToday = date == today,
+                                    memo = memo,
+                                )
                             } else {
                                 Spacer(modifier = GlanceModifier.fillMaxSize())
                             }
@@ -326,7 +333,12 @@ class WorkCalendarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun WidgetDayCell(date: LocalDate, shift: ShiftType, isToday: Boolean) {
+    private fun WidgetDayCell(
+        date: LocalDate,
+        shift: ShiftType,
+        isToday: Boolean,
+        memo: String?,
+    ) {
         val holidayName = HolidayProvider.nameOf(date)
         val numColor = when {
             holidayName != null || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
@@ -379,8 +391,11 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     )
                 }
             }
-            if (holidayName != null) {
-                Text(
+            // 셀 높이가 좁아 메모와 공휴일 이름을 같이 그리면 메모가 잘린다.
+            // 앱 셀과 동일하게 메모 우선 — 공휴일은 빨간 숫자로 식별 가능.
+            when {
+                memo != null -> WidgetMemoChip(memo)
+                holidayName != null -> Text(
                     text = holidayName,
                     style = TextStyle(
                         fontSize = 9.sp,
@@ -390,6 +405,28 @@ class WorkCalendarWidget : GlanceAppWidget() {
                     maxLines = 1,
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun WidgetMemoChip(memo: String) {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .cornerRadius(3.dp)
+                .background(Color.White)
+                .padding(horizontal = 2.dp, vertical = 1.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = memo,
+                style = TextStyle(
+                    fontSize = 9.sp,
+                    color = ColorProvider(Color(0xFF000000)),
+                    fontWeight = FontWeight.Medium,
+                ),
+                maxLines = 2,
+            )
         }
     }
 }
