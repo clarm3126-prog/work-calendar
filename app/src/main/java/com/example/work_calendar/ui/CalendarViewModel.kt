@@ -18,6 +18,7 @@ import com.example.work_calendar.update.UpdateChecker
 import com.example.work_calendar.update.UpdateInfo
 import com.example.work_calendar.update.UpdateInstaller
 import com.example.work_calendar.widget.WorkCalendarWidgetUpdater
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,9 +69,29 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         checkForUpdate()
         // 콜드스타트마다 향후 알람을 다시 등록 — 부팅 후 BootReceiver가 못 미친 경우 보정
         viewModelScope.launch { AlarmRescheduler.rescheduleUpcoming(application) }
+        // 위젯이 마지막으로 보고 있던 월을 가져와 앱 시작 월에 반영.
+        // 위젯에서 6월을 보던 사용자가 앱을 열면 앱도 6월에서 시작 → 일관성.
+        viewModelScope.launch {
+            val widgetMonth = widgetUpdater.readViewedMonth()
+            // showMonth 콜백을 거치면 다시 위젯에 쓰면서 불필요한 round-trip이 발생.
+            // 초기 동기화는 monthState만 직접 갱신해 한쪽 방향으로만 흐르게 한다.
+            monthState.value = widgetMonth
+        }
     }
 
-    fun showMonth(month: YearMonth) { monthState.value = month }
+    // 위젯 월 동기화 작업 — 빠르게 여러 번 호출되면(빠른 스와이프/연타) 이전 sync는
+    // 취소하고 가장 최신 월만 위젯에 쓰도록 한다. DataStore 쓰기는 멀티스레드 IO이라
+    // 순서가 뒤집힐 수 있어 단순 launch로는 마지막 월이 보장되지 않는다.
+    private var widgetMonthSyncJob: Job? = null
+
+    fun showMonth(month: YearMonth) {
+        if (monthState.value == month) return
+        monthState.value = month
+        widgetMonthSyncJob?.cancel()
+        widgetMonthSyncJob = viewModelScope.launch {
+            widgetUpdater.setViewedMonth(month)
+        }
+    }
 
     fun resolvedShift(date: LocalDate, entries: Map<String, DayEntry>): ShiftType =
         repo.resolvedShift(date, entries)

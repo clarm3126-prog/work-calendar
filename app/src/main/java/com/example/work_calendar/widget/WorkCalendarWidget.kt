@@ -7,6 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -19,8 +22,9 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -31,6 +35,7 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -49,29 +54,33 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private const val WIDGET_PREFS = "work_calendar_widget"
-private const val KEY_VIEWED_YEAR = "viewed_year"
-private const val KEY_VIEWED_MONTH = "viewed_month"
+/**
+ * 위젯에서 표시 중인 월(年/月)은 Glance state(PreferencesGlanceStateDefinition)에
+ * 저장한다. SharedPreferences를 직접 쓰던 이전 방식은 변경 시마다 세션을 통째로
+ * 재시작(`updateAll`)해야 해서 클릭 후 반영까지 체감 0.5s+ 지연이 발생했다.
+ * Glance state로 옮기면 같은 세션 안에서 recomposition만 일어나 IPC 외 오버헤드가
+ * 거의 사라진다.
+ *
+ * 키는 둘 다 0(또는 부재)이면 "오늘 기준 월"로 해석한다 — '오늘' 버튼 누르면
+ * 두 키를 제거해 이 의미를 다시 띤다.
+ */
+internal val ViewedYearKey = intPreferencesKey("viewed_year")
+internal val ViewedMonthKey = intPreferencesKey("viewed_month")
 
-private fun Context.viewedMonth(): YearMonth {
-    val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
-    val year = prefs.getInt(KEY_VIEWED_YEAR, 0)
-    val month = prefs.getInt(KEY_VIEWED_MONTH, 0)
-    return if (year > 0 && month in 1..12) YearMonth.of(year, month) else YearMonth.now()
+internal fun monthFromPrefs(prefs: Preferences): YearMonth {
+    val y = prefs[ViewedYearKey] ?: 0
+    val m = prefs[ViewedMonthKey] ?: 0
+    return if (y > 0 && m in 1..12) YearMonth.of(y, m) else YearMonth.now()
 }
 
-private fun Context.setViewedMonth(yearMonth: YearMonth) {
-    getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE).edit()
-        .putInt(KEY_VIEWED_YEAR, yearMonth.year)
-        .putInt(KEY_VIEWED_MONTH, yearMonth.monthValue)
-        .apply()
+internal fun MutablePreferences.setViewedMonth(ym: YearMonth) {
+    this[ViewedYearKey] = ym.year
+    this[ViewedMonthKey] = ym.monthValue
 }
 
-private fun Context.clearViewedMonth() {
-    getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE).edit()
-        .remove(KEY_VIEWED_YEAR)
-        .remove(KEY_VIEWED_MONTH)
-        .apply()
+internal fun MutablePreferences.clearViewedMonth() {
+    remove(ViewedYearKey)
+    remove(ViewedMonthKey)
 }
 
 class WorkCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -90,38 +99,45 @@ class WorkCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class PrevMonthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        context.setViewedMonth(context.viewedMonth().minusMonths(1))
-        WorkCalendarWidget().updateAll(context)
+        updateAppWidgetState(context, glanceId) { prefs ->
+            prefs.setViewedMonth(monthFromPrefs(prefs).minusMonths(1))
+        }
     }
 }
 
 class NextMonthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        context.setViewedMonth(context.viewedMonth().plusMonths(1))
-        WorkCalendarWidget().updateAll(context)
+        updateAppWidgetState(context, glanceId) { prefs ->
+            prefs.setViewedMonth(monthFromPrefs(prefs).plusMonths(1))
+        }
     }
 }
 
 class TodayMonthAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        context.clearViewedMonth()
-        WorkCalendarWidget().updateAll(context)
+        updateAppWidgetState(context, glanceId) { prefs ->
+            prefs.clearViewedMonth()
+        }
     }
 }
 
 class WorkCalendarWidget : GlanceAppWidget() {
 
+    // 월(year/month)을 Glance state(Preferences)로 관리. action callback에서
+    // updateAppWidgetState로 쓰면 같은 세션 안에서 currentState가 새 값으로
+    // recompose되어 세션 재시작 없이 RemoteViews만 갱신된다.
+    override val stateDefinition = PreferencesGlanceStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // 리액티브 구독 — DataStore가 바뀌면(앱에서 메모 저장/삭제 등) 위젯 세션이
-        // 살아있는 동안 자동 재구성되어 즉시 반영된다.
-        // first()로 초기값을 미리 잡아두면 collectAsState의 initial로 첫 컴포지션에서
-        // emptyMap이 한 번 보였다가 즉시 갱신되는 깜빡임이 없다.
+        // 메모/근무 변경(앱쪽 DataStore)은 entriesFlow를 collectAsState로 구독해 반응.
+        // first()로 초기값을 잡아두면 첫 컴포지션에서 emptyMap 깜빡임이 없다.
         val repo = ShiftRepository(context)
         val initialEntries = repo.entriesFlow.first()
 
         provideContent {
             val entries by repo.entriesFlow.collectAsState(initial = initialEntries)
-            val month = context.viewedMonth()
+            val prefs = currentState<Preferences>()
+            val month = monthFromPrefs(prefs)
             GlanceTheme {
                 WidgetContent(month = month, entries = entries)
             }

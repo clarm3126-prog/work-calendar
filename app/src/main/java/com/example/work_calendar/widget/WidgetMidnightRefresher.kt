@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,7 +59,10 @@ class WidgetMidnightReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                WorkCalendarWidget().updateAll(app)
+                // 두 인스턴스 경합 회피를 위해 Receiver를 거치는 브로드캐스트 경로 사용.
+                // 자정 갱신은 "오늘" 강조와 헤더 우측 날짜만 새로 그리면 되므로
+                // WorkCalendarWidgetUpdater.update()로 충분하다.
+                WorkCalendarWidgetUpdater(app).update()
             } finally {
                 WidgetMidnightRefresher.scheduleNext(app)
                 pending.finish()
