@@ -2,6 +2,8 @@ package com.example.work_calendar.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,18 +52,6 @@ import java.util.Locale
 private const val WIDGET_PREFS = "work_calendar_widget"
 private const val KEY_VIEWED_YEAR = "viewed_year"
 private const val KEY_VIEWED_MONTH = "viewed_month"
-
-/**
- * 캐시 없는 호환 표면 — 위젯 갱신 안정성을 우선해 항상 DataStore에서 직접 읽는다.
- * invalidate()는 외부 호출자(WorkCalendarWidgetUpdater)와의 호환을 위해 남겨둔 no-op.
- */
-internal object WidgetEntriesCache {
-    suspend fun getOrLoad(context: Context): Map<String, DayEntry> =
-        ShiftRepository(context).entriesFlow.first()
-
-    @Suppress("RedundantSuspendModifier")
-    suspend fun invalidate() = Unit
-}
 
 private fun Context.viewedMonth(): YearMonth {
     val prefs = getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE)
@@ -122,10 +112,16 @@ class TodayMonthAction : ActionCallback {
 class WorkCalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val entries = WidgetEntriesCache.getOrLoad(context)
-        val month = context.viewedMonth()
+        // 리액티브 구독 — DataStore가 바뀌면(앱에서 메모 저장/삭제 등) 위젯 세션이
+        // 살아있는 동안 자동 재구성되어 즉시 반영된다.
+        // first()로 초기값을 미리 잡아두면 collectAsState의 initial로 첫 컴포지션에서
+        // emptyMap이 한 번 보였다가 즉시 갱신되는 깜빡임이 없다.
+        val repo = ShiftRepository(context)
+        val initialEntries = repo.entriesFlow.first()
 
         provideContent {
+            val entries by repo.entriesFlow.collectAsState(initial = initialEntries)
+            val month = context.viewedMonth()
             GlanceTheme {
                 WidgetContent(month = month, entries = entries)
             }
