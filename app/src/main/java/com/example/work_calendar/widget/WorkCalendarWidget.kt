@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.MutablePreferences
@@ -121,6 +122,13 @@ class TodayMonthAction : ActionCallback {
     }
 }
 
+/** 이번 달이 아닌 날짜(앞뒤로 붙는 이웃 달)의 불투명도 */
+private const val OTHER_MONTH_ALPHA = 0.40f
+
+/** [inMonth]가 false면 알파를 낮춰 반투명 색을 돌려준다. */
+private fun Color.dim(inMonth: Boolean): Color =
+    if (inMonth) this else copy(alpha = alpha * OTHER_MONTH_ALPHA)
+
 class WorkCalendarWidget : GlanceAppWidget() {
 
     // 월(year/month)을 Glance state(Preferences)로 관리. action callback에서
@@ -155,11 +163,17 @@ class WorkCalendarWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(Color(0xFF000000))
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Header(month = month, today = today)
             WeekHeader()
-            MonthGrid(month = month, entries = entries, today = today)
+            // defaultWeight()는 ColumnScope 확장이라 호출부(= 이 Column 안)에서만 쓸 수 있다.
+            MonthGrid(
+                month = month,
+                entries = entries,
+                today = today,
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+            )
         }
     }
 
@@ -168,7 +182,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val monthText = month.format(DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN))
         val todayText = today.format(DateTimeFormatter.ofPattern("M.d (E)", Locale.KOREAN))
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // 좌측: '오늘' 버튼 → 현재 월로 점프
@@ -192,7 +206,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = GlanceModifier
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 4.dp)
                         .clickable(actionRunCallback<PrevMonthAction>()),
                 ) {
                     Text(
@@ -214,7 +228,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 )
                 Box(
                     modifier = GlanceModifier
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 4.dp)
                         .clickable(actionRunCallback<NextMonthAction>()),
                 ) {
                     Text(
@@ -247,7 +261,7 @@ class WorkCalendarWidget : GlanceAppWidget() {
     @Composable
     private fun WeekHeader() {
         val labels = listOf("일", "월", "화", "수", "목", "금", "토")
-        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 2.dp)) {
             labels.forEachIndexed { index, label ->
                 val color = when (index) {
                     0 -> ColorProvider(Color(0xFFEF5350))
@@ -268,20 +282,29 @@ class WorkCalendarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun MonthGrid(month: YearMonth, entries: Map<String, DayEntry>, today: LocalDate) {
+    private fun MonthGrid(
+        month: YearMonth,
+        entries: Map<String, DayEntry>,
+        today: LocalDate,
+        modifier: GlanceModifier,
+    ) {
         val firstOfMonth = month.atDay(1)
         val leadingEmpty = firstOfMonth.dayOfWeek.value % 7
         val daysInMonth = month.lengthOfMonth()
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
+        // 1일이 금/토인 달(예: 2026-08)은 6주 = 42칸이 된다. 셀 내용이 5주 기준
+        // 고정 크기(26dp 배지 + 여백)라 6주일 때 마지막 주가 위젯 밖으로 밀려 잘렸다.
+        // 6주인 달만 한 단계 조밀하게 그려 마지막 주(8/31 등)까지 들어오게 한다.
+        val compact = rows >= 6
 
         // 주(週) 사이에만 가로 구분선을 그어 행을 시각적으로 분리한다 (세로선 없음)
         // MonthGrid 전체에 단일 clickable을 부여 — 셀 단위로 두면 PendingIntent가 30~40개 생겨 위젯 갱신이 느려진다
         val gridLineColor = Color(0xFF333333)
+        // fillMaxSize()는 match_parent로 번역돼 헤더가 차지한 높이까지 요구하게 된다.
+        // defaultWeight()로 "남은 높이만" 가져가야 마지막 주가 아래로 잘려나가지 않는다.
         Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .clickable(actionStartActivity<MainActivity>()),
+            modifier = modifier.clickable(actionStartActivity<MainActivity>()),
         ) {
             for (row in 0 until rows) {
                 if (row > 0) {
@@ -299,26 +322,25 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 ) {
                     for (col in 0 until 7) {
                         val cell = row * 7 + col
-                        val dayNumber = cell - leadingEmpty + 1
+                        // 앞/뒤 빈칸도 이웃 달의 실제 날짜로 채운다 — 반투명으로 구분.
+                        val date = firstOfMonth.plusDays((cell - leadingEmpty).toLong())
+                        val inMonth = YearMonth.from(date) == month
+                        val entry = entries[date.toString()]
+                        val shift = entry?.overrideShift()
+                            ?: ShiftSchedule.cycleShift(date)
+                        val memo = entry?.memo?.takeIf { it.isNotBlank() }
                         Box(
                             modifier = GlanceModifier.defaultWeight(),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (dayNumber in 1..daysInMonth) {
-                                val date = month.atDay(dayNumber)
-                                val entry = entries[date.toString()]
-                                val shift = entry?.overrideShift()
-                                    ?: ShiftSchedule.cycleShift(date)
-                                val memo = entry?.memo?.takeIf { it.isNotBlank() }
-                                WidgetDayCell(
-                                    date = date,
-                                    shift = shift,
-                                    isToday = date == today,
-                                    memo = memo,
-                                )
-                            } else {
-                                Spacer(modifier = GlanceModifier.fillMaxSize())
-                            }
+                            WidgetDayCell(
+                                date = date,
+                                shift = shift,
+                                isToday = inMonth && date == today,
+                                memo = memo,
+                                inMonth = inMonth,
+                                compact = compact,
+                            )
                         }
                     }
                 }
@@ -332,45 +354,56 @@ class WorkCalendarWidget : GlanceAppWidget() {
         shift: ShiftType,
         isToday: Boolean,
         memo: String?,
+        inMonth: Boolean,
+        compact: Boolean,
     ) {
         val holidayName = HolidayProvider.nameOf(date)
-        val numColor = when {
+        val baseNumColor = when {
             holidayName != null || date.dayOfWeek == DayOfWeek.SUNDAY -> Color(0xFFEF5350)
             date.dayOfWeek == DayOfWeek.SATURDAY -> Color(0xFF42A5F5)
             else -> Color(0xFFEFEFEF)
         }
+        // Glance에는 Modifier.alpha가 없어 색 자체의 알파를 낮춰 반투명을 만든다.
+        val numColor = baseNumColor.dim(inMonth)
         val isOff = shift == ShiftType.OFF
+
+        // 6주짜리 달에서만 한 단계 조밀하게 — 5주 달은 기존 크기를 그대로 유지한다.
+        val slot = if (compact) 22.dp else 26.dp
+        val slotRadius = if (compact) 11.dp else 13.dp
+        val numSize = if (compact) 11.sp else 12.sp
+        val labelSize = if (compact) 8.sp else 9.sp
+        val cellPadding = if (compact) 2.dp else 4.dp
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .cornerRadius(8.dp)
                 .background(if (isToday) Color(0x3342A5F5) else Color.Transparent)
-                .padding(horizontal = 2.dp, vertical = 4.dp),
+                .padding(horizontal = 2.dp, vertical = cellPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
                 style = TextStyle(
-                    fontSize = 12.sp,
+                    fontSize = numSize,
                     color = ColorProvider(numColor),
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                 ),
             )
-            // 휴(텍스트)와 근무 원형(26dp)의 높이가 달라 셀마다 메모 시작 y가 어긋난다.
-            // 슬롯을 26dp 고정으로 통일해 메모/공휴일 라벨이 항상 같은 위치에 오도록 함.
+            // 휴(텍스트)와 근무 원형의 높이가 달라 셀마다 메모 시작 y가 어긋난다.
+            // 슬롯을 고정 크기로 통일해 메모/공휴일 라벨이 항상 같은 위치에 오도록 함.
             Box(
                 modifier = GlanceModifier
-                    .height(26.dp)
-                    .width(26.dp),
+                    .height(slot)
+                    .width(slot),
                 contentAlignment = Alignment.Center,
             ) {
                 if (isOff) {
                     Text(
                         text = "휴",
                         style = TextStyle(
-                            fontSize = 13.sp,
-                            color = ColorProvider(shift.composeColor),
+                            fontSize = if (compact) 12.sp else 13.sp,
+                            color = ColorProvider(shift.composeColor.dim(inMonth)),
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
                         ),
@@ -378,17 +411,22 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 } else {
                     Box(
                         modifier = GlanceModifier
-                            .width(26.dp)
-                            .height(26.dp)
-                            .cornerRadius(13.dp)
-                            .background(shift.composeColor),
+                            .width(slot)
+                            .height(slot)
+                            .cornerRadius(slotRadius)
+                            .background(shift.composeColor.dim(inMonth)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = shift.label,
                             style = TextStyle(
-                                fontSize = if (shift.label.length > 1) 11.sp else 13.sp,
-                                color = ColorProvider(shift.composeOnColor),
+                                fontSize = when {
+                                    shift.label.length > 1 && compact -> 10.sp
+                                    shift.label.length > 1 -> 11.sp
+                                    compact -> 12.sp
+                                    else -> 13.sp
+                                },
+                                color = ColorProvider(shift.composeOnColor.dim(inMonth)),
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                             ),
@@ -402,8 +440,8 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 Text(
                     text = holidayName,
                     style = TextStyle(
-                        fontSize = 9.sp,
-                        color = ColorProvider(Color(0xFFEF5350)),
+                        fontSize = labelSize,
+                        color = ColorProvider(Color(0xFFEF5350).dim(inMonth)),
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
                     ),
@@ -411,25 +449,26 @@ class WorkCalendarWidget : GlanceAppWidget() {
                 )
             }
             if (memo != null) {
-                WidgetMemoChip(memo)
+                WidgetMemoChip(memo = memo, inMonth = inMonth, fontSize = labelSize)
             }
         }
     }
 
     @Composable
-    private fun WidgetMemoChip(memo: String) {
+    private fun WidgetMemoChip(memo: String, inMonth: Boolean, fontSize: TextUnit) {
         Box(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .cornerRadius(3.dp)
-                .background(Color.White)
+                // 이번 달이 아니면 흰 칩을 반투명으로 — 검은 배경 위에서 회색 칩이 된다.
+                .background(if (inMonth) Color.White else Color(0x8AFFFFFF))
                 .padding(horizontal = 2.dp, vertical = 1.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = memo,
                 style = TextStyle(
-                    fontSize = 9.sp,
+                    fontSize = fontSize,
                     color = ColorProvider(Color(0xFF000000)),
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,

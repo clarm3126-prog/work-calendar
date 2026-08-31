@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +65,9 @@ private fun monthsBetween(from: YearMonth, to: YearMonth): Int =
 private val MonthFormatter = DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN)
 private val TodayDateFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
 private val WeekHeaders = listOf("일", "월", "화", "수", "목", "금", "토")
+
+/** 이번 달이 아닌 날짜(앞뒤로 붙는 이웃 달)의 불투명도 */
+private const val OtherMonthAlpha = 0.38f
 
 @Composable
 fun CalendarScreen(
@@ -350,25 +354,26 @@ private fun MonthGrid(
         while (cell < totalCells) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 for (col in 0 until 7) {
-                    val dayNumber = cell - leadingEmpty + 1
-                    val date = if (dayNumber in 1..daysInMonth) month.atDay(dayNumber) else null
+                    // 앞/뒤 빈칸도 이웃 달의 실제 날짜로 채운다 — 반투명으로 구분해
+                    // 주(週)가 어디서 시작·끝나는지 한눈에 보이게 한다.
+                    val date = firstOfMonth.plusDays((cell - leadingEmpty).toLong())
+                    val inMonth = YearMonth.from(date) == month
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .aspectRatio(0.7f)
                             .padding(1.dp),
                     ) {
-                        if (date != null) {
-                            val shift = resolveShift(date)
-                            DayCell(
-                                date = date,
-                                shift = shift,
-                                entry = entries[date.toString()],
-                                hasAlarm = hasActiveAlarm(date, shift),
-                                isToday = date == today,
-                                onClick = { onClick(date) },
-                            )
-                        }
+                        val shift = resolveShift(date)
+                        DayCell(
+                            date = date,
+                            shift = shift,
+                            entry = entries[date.toString()],
+                            hasAlarm = hasActiveAlarm(date, shift),
+                            isToday = inMonth && date == today,
+                            inMonth = inMonth,
+                            onClick = { onClick(date) },
+                        )
                     }
                     cell++
                 }
@@ -384,6 +389,7 @@ private fun DayCell(
     entry: DayEntry?,
     hasAlarm: Boolean,
     isToday: Boolean,
+    inMonth: Boolean,
     onClick: () -> Unit,
 ) {
     val holidayName = remember(date) { HolidayProvider.nameOf(date) }
@@ -407,6 +413,7 @@ private fun DayCell(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .alpha(if (inMonth) 1f else OtherMonthAlpha)
             .clip(cellShape)
             .then(highlightMod)
             .clickable { onClick() }
