@@ -293,54 +293,62 @@ class WorkCalendarWidget : GlanceAppWidget() {
         val daysInMonth = month.lengthOfMonth()
         val totalCells = ((leadingEmpty + daysInMonth + 6) / 7) * 7
         val rows = totalCells / 7
-        // 1일이 금/토인 달(예: 2026-08)은 6주 = 42칸이 된다. 셀 내용이 5주 기준
-        // 고정 크기(26dp 배지 + 여백)라 6주일 때 마지막 주가 위젯 밖으로 밀려 잘렸다.
-        // 6주인 달만 한 단계 조밀하게 그려 마지막 주(8/31 등)까지 들어오게 한다.
+        // 6주 달은 한 행에 돌아가는 높이가 줄어든다. 위젯을 작게 리사이즈해 둔
+        // 경우 셀 내용(배지 + 라벨)이 행 높이를 넘겨 아래가 눌리므로, 6주 달만
+        // 한 단계 조밀하게 그린다. 5주 달은 기존 크기 그대로.
         val compact = rows >= 6
 
         // 주(週) 사이에만 가로 구분선을 그어 행을 시각적으로 분리한다 (세로선 없음)
         // MonthGrid 전체에 단일 clickable을 부여 — 셀 단위로 두면 PendingIntent가 30~40개 생겨 위젯 갱신이 느려진다
         val gridLineColor = Color(0xFF333333)
-        // fillMaxSize()는 match_parent로 번역돼 헤더가 차지한 높이까지 요구하게 된다.
-        // defaultWeight()로 "남은 높이만" 가져가야 마지막 주가 아래로 잘려나가지 않는다.
+        // Glance 컨테이너는 자식을 10개까지만 담는다 — 넘치면 조용히 버려진다.
+        // 구분선 Spacer를 이 Column의 형제로 두면 6주 달에서 6행 + 5구분선 = 11개가
+        // 되어 마지막 주(8/31 등)가 통째로 사라졌다. 구분선을 주(週) Column 안으로
+        // 넣어 바깥 Column의 자식 수를 항상 행 수(최대 6)로 유지한다.
         Column(
             modifier = modifier.clickable(actionStartActivity<MainActivity>()),
         ) {
             for (row in 0 until rows) {
-                if (row > 0) {
-                    Spacer(
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(gridLineColor),
-                    )
-                }
-                Row(
+                Column(
                     modifier = GlanceModifier
                         .fillMaxWidth()
                         .defaultWeight(),
                 ) {
-                    for (col in 0 until 7) {
-                        val cell = row * 7 + col
-                        // 앞/뒤 빈칸도 이웃 달의 실제 날짜로 채운다 — 반투명으로 구분.
-                        val date = firstOfMonth.plusDays((cell - leadingEmpty).toLong())
-                        val inMonth = YearMonth.from(date) == month
-                        val entry = entries[date.toString()]
-                        val shift = entry?.overrideShift()
-                            ?: ShiftSchedule.cycleShift(date)
-                        val memo = entry?.memo?.takeIf { it.isNotBlank() }
-                        Box(
-                            modifier = GlanceModifier.defaultWeight(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            WidgetDayCell(
-                                date = date,
-                                shift = shift,
-                                isToday = inMonth && date == today,
-                                memo = memo,
-                                inMonth = inMonth,
-                                compact = compact,
-                            )
+                    if (row > 0) {
+                        Spacer(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(gridLineColor),
+                        )
+                    }
+                    Row(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .defaultWeight(),
+                    ) {
+                        for (col in 0 until 7) {
+                            val cell = row * 7 + col
+                            // 앞/뒤 빈칸도 이웃 달의 실제 날짜로 채운다 — 반투명으로 구분.
+                            val date = firstOfMonth.plusDays((cell - leadingEmpty).toLong())
+                            val inMonth = YearMonth.from(date) == month
+                            val entry = entries[date.toString()]
+                            val shift = entry?.overrideShift()
+                                ?: ShiftSchedule.cycleShift(date)
+                            val memo = entry?.memo?.takeIf { it.isNotBlank() }
+                            Box(
+                                modifier = GlanceModifier.defaultWeight(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                WidgetDayCell(
+                                    date = date,
+                                    shift = shift,
+                                    isToday = inMonth && date == today,
+                                    memo = memo,
+                                    inMonth = inMonth,
+                                    compact = compact,
+                                )
+                            }
                         }
                     }
                 }
