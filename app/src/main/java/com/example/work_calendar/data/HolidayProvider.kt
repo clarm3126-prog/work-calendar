@@ -80,8 +80,7 @@ object HolidayProvider {
 
     /**
      * 공휴일법 시행령(제2조) 기준 대체공휴일 자동 계산.
-     * - 삼일절·광복절·개천절·한글날·어린이날 : 토·일과 겹치는 경우
-     * - 부처님오신날·크리스마스 : 일요일과 겹치는 경우
+     * - 삼일절·광복절·개천절·한글날·어린이날·부처님오신날·크리스마스 : 토·일과 겹치는 경우
      * - 설날 연휴·추석 연휴 : 연휴 중 일요일과 겹치는 경우 마지막 연휴 다음 평일 1일
      * - 신정·현충일 : 대체공휴일 대상 아님
      *
@@ -96,8 +95,8 @@ object HolidayProvider {
             val dow = date.dayOfWeek
             val isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY
             val needsSub = when (name) {
-                "삼일절", "광복절", "개천절", "한글날", "어린이날" -> isWeekend
-                "부처님오신날", "크리스마스" -> dow == DayOfWeek.SUNDAY
+                "삼일절", "광복절", "개천절", "한글날", "어린이날",
+                "부처님오신날", "크리스마스" -> isWeekend
                 else -> false
             }
             if (needsSub) {
